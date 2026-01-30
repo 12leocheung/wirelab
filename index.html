@@ -3,119 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate DC & Logic Lab</title>
+    <title>Ultimate DC & Logic Lab - Dark Edition</title>
     <style>
         :root {
-            --bg-color: #f0f4f8;
-            --panel-color: #ffffff;
-            --accent-color: #2196F3;
-            --wire-off: #546e7a;
-            --wire-on: #ffeb3b;
-            --danger: #f44336;
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --accent-color: #03a9f4;
+            --wire-off: #37474f;
+            --wire-on: #ffee58;
+            --danger: #ff5252;
+            --text-main: #e0e0e0;
+            --text-dim: #90a4ae;
+            --border-color: #333333;
         }
 
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background-color: var(--bg-color); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background-color: var(--bg-color); color: var(--text-main); }
         #app { display: flex; width: 100vw; height: 100vh; }
 
         /* Side Panel */
         #toolbox {
-            width: 280px; background: var(--panel-color); border-right: 2px solid #cfd8dc;
+            width: 280px; background: var(--panel-color); border-right: 2px solid var(--border-color);
             display: flex; flex-direction: column; padding: 15px; overflow-y: auto; z-index: 10;
         }
-        h2 { margin-top: 0; color: #37474f; font-size: 1.1rem; border-bottom: 2px solid var(--accent-color); padding-bottom: 8px; }
-        h3 { font-size: 0.8rem; color: #78909c; margin: 15px 0 5px 0; text-transform: uppercase; letter-spacing: 1px; }
+        h2 { margin-top: 0; color: var(--accent-color); font-size: 1.1rem; border-bottom: 2px solid var(--accent-color); padding-bottom: 8px; }
+        h3 { font-size: 0.8rem; color: var(--text-dim); margin: 15px 0 5px 0; text-transform: uppercase; letter-spacing: 1px; }
 
         .tool-item {
-            background: #eceff1; border: 1px solid #b0bec5; border-radius: 8px;
+            background: #2c2c2c; border: 1px solid #444; border-radius: 8px;
             padding: 8px 12px; margin-bottom: 6px; cursor: grab; display: flex; align-items: center; gap: 12px;
-            transition: all 0.2s; font-size: 13px; user-select: none;
+            transition: all 0.2s; font-size: 13px; user-select: none; color: var(--text-main);
         }
-        .tool-item:hover { background: #e1f5fe; border-color: var(--accent-color); }
+        .tool-item:hover { background: #3d3d3d; border-color: var(--accent-color); }
         .tool-icon {
-            width: 30px; height: 22px; background: #fff; border: 1px solid #999;
-            display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; border-radius: 4px;
+            width: 30px; height: 22px; background: #121212; border: 1px solid #555;
+            display: flex; justify-content: center; align-items: center; font-size: 10px; font-weight: bold; border-radius: 4px; color: var(--accent-color);
         }
 
         /* Workspace */
-        #workspace-container { flex-grow: 1; position: relative; overflow: hidden; background-color: #fafafa; }
+        #workspace-container { flex-grow: 1; position: relative; overflow: hidden; background-color: #0a0a0a; }
         #workspace {
             position: absolute; width: 5000px; height: 5000px; top: 0; left: 0;
-            background-image: radial-gradient(#cfd8dc 1px, transparent 1px); background-size: 25px 25px; transform-origin: 0 0;
+            background-image: radial-gradient(#222 1px, transparent 1px); background-size: 25px 25px; transform-origin: 0 0;
         }
         canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
 
         /* Components */
         .component {
-            position: absolute; background: white; border: 2px solid #455a64; border-radius: 6px;
+            position: absolute; background: #252525; border: 2px solid #444; border-radius: 6px;
             padding: 8px; cursor: move; display: flex; flex-direction: column; align-items: center;
-            min-width: 80px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); user-select: none;
+            min-width: 80px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); user-select: none;
         }
-        .component.selected { border-color: var(--accent-color); box-shadow: 0 0 12px rgba(33, 150, 243, 0.4); }
-        .component.gate { background: #fff3e0; border-color: #ef6c00; }
-        .component.power { background: #e8f5e9; border-color: #2e7d32; }
-        .component.timing { background: #f3e5f5; border-color: #7b1fa2; }
-        .component.meter { background: #e3f2fd; border-color: #1565c0; }
-
-        .component-label { font-size: 10px; font-weight: bold; color: #455a64; margin-bottom: 4px; text-transform: uppercase; }
+        .component.selected { border-color: var(--accent-color); box-shadow: 0 0 15px rgba(3, 169, 244, 0.3); }
         
-        /* Interactive Elements */
+        /* Category-specific glows */
+        .component.gate { border-color: #ff9800; }
+        .component.power { border-color: #4caf50; }
+        .component.timing { border-color: #9c27b0; }
+        .component.meter { border-color: #2196f3; }
+
+        .component-label { font-size: 10px; font-weight: bold; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; }
+        
         .node {
-            width: 12px; height: 12px; background: #fff; border: 2px solid #455a64; border-radius: 50%;
-            position: absolute; cursor: crosshair; z-index: 5; transition: transform 0.2s;
+            width: 12px; height: 12px; background: #121212; border: 2px solid #666; border-radius: 50%;
+            position: absolute; cursor: crosshair; z-index: 5; transition: all 0.2s;
         }
-        .node:hover { transform: scale(1.4); background: var(--accent-color); }
+        .node:hover { transform: scale(1.4); background: var(--accent-color); border-color: white; }
         .node.input { left: -8px; }
         .node.output { right: -8px; }
 
         .readout {
-            font-family: monospace; background: #263238; color: #00e676;
-            padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-top: 4px;
+            font-family: 'Courier New', monospace; background: #000; color: #00ff41;
+            padding: 2px 6px; border-radius: 3px; font-size: 12px; margin-top: 4px; border: 1px solid #333;
         }
 
         .switch-btn {
-            width: 34px; height: 18px; background: #b0bec5; border-radius: 10px;
-            position: relative; cursor: pointer; border: 1px solid #78909c;
+            width: 34px; height: 18px; background: #444; border-radius: 10px;
+            position: relative; cursor: pointer; border: 1px solid #555;
         }
-        .switch-btn.on { background: #4caf50; }
+        .switch-btn.on { background: #2e7d32; }
         .switch-btn::after {
             content: ''; position: absolute; width: 14px; height: 14px;
-            background: white; border-radius: 50%; top: 1px; left: 2px; transition: 0.2s;
+            background: #eee; border-radius: 50%; top: 1px; left: 2px; transition: 0.2s;
         }
-        .switch-btn.on::after { transform: translateX(16px); }
+        .switch-btn.on::after { transform: translateX(16px); background: #fff; }
 
         .btn-momentary {
-            width: 25px; height: 25px; background: #d32f2f; border-radius: 50%;
-            border: 3px solid #b71c1c; cursor: pointer; box-shadow: 0 3px 0 #7f0000;
+            width: 25px; height: 25px; background: #b71c1c; border-radius: 50%;
+            border: 3px solid #7f0000; cursor: pointer; box-shadow: 0 3px 0 #5f0000;
         }
-        .btn-momentary:active { transform: translateY(2px); box-shadow: 0 1px 0 #7f0000; }
+        .btn-momentary:active { transform: translateY(2px); box-shadow: 0 1px 0 #5f0000; }
 
-        .light-bulb { width: 24px; height: 24px; border-radius: 50% 50% 40% 40%; background: #616161; border: 2px solid #424242; }
-        .fuse-wire { width: 30px; height: 4px; background: #90caf9; border-radius: 2px; }
-        .fuse-wire.blown { background: #555; text-decoration: line-through; opacity: 0.5; }
+        .light-bulb { width: 24px; height: 24px; border-radius: 50% 50% 40% 40%; background: #333; border: 2px solid #222; transition: 0.2s; }
+        .fuse-wire { width: 30px; height: 4px; background: #4fc3f7; border-radius: 2px; }
+        .fuse-wire.blown { background: #222; text-decoration: line-through; opacity: 0.3; }
 
-        .seven-seg { display: grid; grid-template-areas: " . a . " " f . b " " . g . " " e . c " " . d . "; gap: 2px; background: #111; padding: 4px; border-radius: 4px; }
-        .seg { background: #222; border-radius: 1px; }
+        .seven-seg { display: grid; grid-template-areas: " . a . " " f . b " " . g . " " e . c " " . d . "; gap: 2px; background: #000; padding: 4px; border-radius: 4px; }
+        .seg { background: #1a1a1a; border-radius: 1px; }
         .seg-h { width: 14px; height: 3px; }
         .seg-v { width: 3px; height: 14px; }
-        .seg.on { background: #ff1744; box-shadow: 0 0 5px #ff1744; }
+        .seg.on { background: #ff1744; box-shadow: 0 0 8px #ff1744; }
 
         #props-panel {
             position: absolute; right: 20px; top: 20px; width: 200px;
-            background: white; border: 2px solid #cfd8dc; border-radius: 10px; padding: 12px; display: none; z-index: 100;
+            background: #1e1e1e; border: 2px solid #444; border-radius: 10px; padding: 12px; display: none; z-index: 100;
         }
         .delete-btn {
             position: absolute; top: -8px; right: -8px; width: 18px; height: 18px;
             background: var(--danger); color: white; border-radius: 50%; display: none;
-            justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 2px solid white;
+            justify-content: center; align-items: center; font-size: 14px; cursor: pointer; border: 2px solid #1e1e1e;
         }
         .component:hover .delete-btn { display: flex; }
+        
+        button#reset-btn {
+            margin-top: 20px; padding: 10px; background: #37474f; color: white; 
+            border: 1px solid #455a64; border-radius: 5px; cursor: pointer; transition: 0.2s;
+        }
+        button#reset-btn:hover { background: var(--danger); }
+
+        input[type=range] { width: 100%; accent-color: var(--accent-color); }
     </style>
 </head>
 <body>
 
 <div id="app">
     <div id="toolbox">
-        <h2>Component Lab</h2>
+        <h2>Dark Lab</h2>
         
         <h3>Power & Input</h3>
         <div class="tool-item" draggable="true" data-type="BATTERY"><div class="tool-icon">9V</div><span>Battery</span></div>
@@ -123,24 +135,31 @@
         <div class="tool-item" draggable="true" data-type="SWITCH"><div class="tool-icon">⏻</div><span>Toggle Switch</span></div>
         <div class="tool-item" draggable="true" data-type="BUTTON"><div class="tool-icon">🔘</div><span>Push Button</span></div>
 
+        <h3>Logic Gates</h3>
+        <div class="tool-item" draggable="true" data-type="AND"><div class="tool-icon">&</div><span>AND Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="OR"><div class="tool-icon">≥1</div><span>OR Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="NOT"><div class="tool-icon">1</div><span>NOT Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="NAND"><div class="tool-icon">!&</div><span>NAND Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="NOR"><div class="tool-icon">!≥</div><span>NOR Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="XOR"><div class="tool-icon">=1</div><span>XOR Gate</span></div>
+        <div class="tool-item" draggable="true" data-type="XNOR"><div class="tool-icon">!X</div><span>XNOR Gate</span></div>
+
+        <h3>Memory</h3>
+        <div class="tool-item" draggable="true" data-type="SR_LATCH"><div class="tool-icon">SR</div><span>SR Latch</span></div>
+        <div class="tool-item" draggable="true" data-type="D_FF"><div class="tool-icon">D</div><span>D Flip-Flop</span></div>
+
         <h3>Analog & Load</h3>
         <div class="tool-item" draggable="true" data-type="RESISTOR"><div class="tool-icon">Ω</div><span>Resistor</span></div>
         <div class="tool-item" draggable="true" data-type="FUSE"><div class="tool-icon">〰</div><span>Fuse</span></div>
         <div class="tool-item" draggable="true" data-type="LIGHT"><div class="tool-icon">💡</div><span>Light Bulb</span></div>
-        <div class="tool-item" draggable="true" data-type="DELAY"><div class="tool-icon">⏳</div><span>Delay (Repeater)</span></div>
+        <div class="tool-item" draggable="true" data-type="DELAY"><div class="tool-icon">⏳</div><span>Delay</span></div>
 
         <h3>Measurement</h3>
         <div class="tool-item" draggable="true" data-type="VOLTMETER"><div class="tool-icon">V</div><span>Voltmeter</span></div>
         <div class="tool-item" draggable="true" data-type="AMMETER"><div class="tool-icon">A</div><span>Ammeter</span></div>
         <div class="tool-item" draggable="true" data-type="7SEG"><div class="tool-icon">8.</div><span>7-Segment</span></div>
 
-        <h3>Logic Gates</h3>
-        <div class="tool-item" draggable="true" data-type="AND"><div class="tool-icon">&</div><span>AND Gate</span></div>
-        <div class="tool-item" draggable="true" data-type="OR"><div class="tool-icon">≥1</div><span>OR Gate</span></div>
-        <div class="tool-item" draggable="true" data-type="NOT"><div class="tool-icon">1</div><span>NOT Gate</span></div>
-        <div class="tool-item" draggable="true" data-type="XOR"><div class="tool-icon">=1</div><span>XOR Gate</span></div>
-
-        <button onclick="clearCanvas()" style="margin-top: 20px; padding: 10px; background: #546e7a; color: white; border: none; border-radius: 5px; cursor: pointer;">Reset Workspace</button>
+        <button id="reset-btn" onclick="clearCanvas()">Reset Workspace</button>
     </div>
 
     <div id="workspace-container">
@@ -148,13 +167,14 @@
             <canvas id="wireCanvas"></canvas>
         </div>
         <div id="props-panel">
-            <h4 id="props-title" style="margin:0 0 10px 0; font-size: 12px;">Properties</h4>
+            <h4 id="props-title" style="margin:0 0 10px 0; font-size: 12px; color: var(--accent-color);">Properties</h4>
             <div id="props-content"></div>
         </div>
     </div>
 </div>
 
 <script>
+    // Logic remains identical to ensure no features are lost
     const container = document.getElementById('workspace-container');
     const workspace = document.getElementById('workspace');
     const canvas = document.getElementById('wireCanvas');
@@ -176,6 +196,7 @@
             this.x = x; this.y = y;
             this.state = false;
             this.blown = false;
+            this.lastClockState = false;
             this.value = this.getDefaultValue();
             this.inputVals = new Array(8).fill(0);
             this.voltageOut = 0;
@@ -196,7 +217,8 @@
         }
 
         getCategory() {
-            if(['AND','OR','NOT','XOR'].includes(this.type)) return 'gate';
+            if(['AND','OR','NOT','XOR','NAND','NOR','XNOR'].includes(this.type)) return 'gate';
+            if(['SR_LATCH','D_FF'].includes(this.type)) return 'timing';
             if(['BATTERY','SWITCH','BUTTON'].includes(this.type)) return 'power';
             if(['CLOCK','DELAY'].includes(this.type)) return 'timing';
             if(['VOLTMETER','AMMETER','7SEG'].includes(this.type)) return 'meter';
@@ -210,8 +232,12 @@
                 'RESISTOR': { in: 1, out: 1 }, 'FUSE': { in: 1, out: 1 },
                 'LIGHT': { in: 1, out: 1 }, 'DELAY': { in: 1, out: 1 },
                 'VOLTMETER': { in: 2, out: 0 }, 'AMMETER': { in: 1, out: 1 },
-                '7SEG': { in: 7, out: 0 }, 'AND': { in: 2, out: 1 },
-                'OR': { in: 2, out: 1 }, 'NOT': { in: 1, out: 1 }, 'XOR': { in: 2, out: 1 }
+                '7SEG': { in: 7, out: 0 }, 
+                'AND': { in: 2, out: 1 }, 'OR': { in: 2, out: 1 }, 
+                'NOT': { in: 1, out: 1 }, 'XOR': { in: 2, out: 1 },
+                'NAND': { in: 2, out: 1 }, 'NOR': { in: 2, out: 1 },
+                'XNOR': { in: 2, out: 1 }, 'SR_LATCH': { in: 2, out: 1 },
+                'D_FF': { in: 2, out: 1 }
             };
             return counts[this.type] || { in: 1, out: 1 };
         }
@@ -223,7 +249,7 @@
 
             const label = document.createElement('div');
             label.className = 'component-label';
-            label.innerText = this.type;
+            label.innerText = this.type.replace('_', ' ');
             div.appendChild(label);
 
             const del = document.createElement('div');
@@ -296,8 +322,13 @@
                 div.appendChild(sCont);
             } else {
                 const sym = document.createElement('div');
-                sym.style.fontSize = '16px'; sym.style.fontWeight = 'bold';
-                const symbols = {'AND':'&','OR':'≥1','NOT':'1','XOR':'=1','RESISTOR':'Ω','BATTERY':'🔋','CLOCK':'⏱','DELAY':'⏳'};
+                sym.style.fontSize = '16px'; sym.style.fontWeight = 'bold'; sym.style.color = 'white';
+                const symbols = {
+                    'AND':'&','OR':'≥1','NOT':'1','XOR':'=1',
+                    'NAND':'!&', 'NOR':'!≥', 'XNOR':'!X',
+                    'RESISTOR':'Ω','BATTERY':'🔋','CLOCK':'⏱','DELAY':'⏳',
+                    'SR_LATCH':'SR', 'D_FF':'DFF'
+                };
                 sym.innerText = symbols[this.type] || '';
                 div.appendChild(sym);
             }
@@ -339,7 +370,6 @@
         components.forEach(c => c.inputVals.fill(0));
         const isHigh = (v) => v > 2.0;
 
-        // Iterate multiple times to propagate through gates
         for(let step=0; step<5; step++) {
             components.forEach(c => {
                 const incoming = wires.filter(w => w.to === c);
@@ -365,13 +395,30 @@
                     case 'LIGHT':
                         c.voltageOut = c.inputVals[0] * 0.8;
                         const bulb = c.element.querySelector('.light-bulb');
-                        bulb.style.background = isHigh(c.inputVals[0]) ? '#ffeb3b' : '#616161';
-                        bulb.style.boxShadow = isHigh(c.inputVals[0]) ? '0 0 15px #ffeb3b' : 'none';
+                        const active = isHigh(c.inputVals[0]);
+                        bulb.style.background = active ? '#fff176' : '#333';
+                        bulb.style.boxShadow = active ? '0 0 20px #fff176' : 'none';
                         break;
                     case 'AND': c.voltageOut = (isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; break;
                     case 'OR':  c.voltageOut = (isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; break;
                     case 'NOT': c.voltageOut = isHigh(c.inputVals[0]) ? 0 : 9; break;
                     case 'XOR': c.voltageOut = (isHigh(c.inputVals[0]) !== isHigh(c.inputVals[1])) ? 9 : 0; break;
+                    case 'NAND': c.voltageOut = !(isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; break;
+                    case 'NOR':  c.voltageOut = !(isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; break;
+                    case 'XNOR': c.voltageOut = (isHigh(c.inputVals[0]) === isHigh(c.inputVals[1])) ? 9 : 0; break;
+                    case 'SR_LATCH':
+                        if (isHigh(c.inputVals[0])) c.state = true;
+                        if (isHigh(c.inputVals[1])) c.state = false;
+                        c.voltageOut = c.state ? 9 : 0;
+                        break;
+                    case 'D_FF':
+                        const clockNow = isHigh(c.inputVals[1]);
+                        if (!c.lastClockState && clockNow) {
+                            c.state = isHigh(c.inputVals[0]);
+                        }
+                        c.lastClockState = clockNow;
+                        c.voltageOut = c.state ? 9 : 0;
+                        break;
                     case 'VOLTMETER':
                         const diff = Math.abs(c.inputVals[0] - c.inputVals[1]);
                         c.element.querySelector('.readout').innerText = diff.toFixed(2) + 'V';
@@ -402,12 +449,15 @@
             const sR = sN.getBoundingClientRect(), eR = eN.getBoundingClientRect(), wR = workspace.getBoundingClientRect();
             const x1 = sR.left + 6 - wR.left, y1 = sR.top + 6 - wR.top, x2 = eR.left + 6 - wR.left, y2 = eR.top + 6 - wR.top;
             ctx.beginPath(); ctx.lineWidth = 4;
-            ctx.strokeStyle = w.from.voltageOut > 2 ? '#ffeb3b' : '#546e7a';
+            ctx.strokeStyle = w.from.voltageOut > 2 ? '#ffee58' : '#37474f';
+            ctx.shadowBlur = w.from.voltageOut > 2 ? 8 : 0;
+            ctx.shadowColor = '#ffee58';
             ctx.moveTo(x1, y1); ctx.bezierCurveTo(x1 + 40, y1, x2 - 40, y2, x2, y2); ctx.stroke();
+            ctx.shadowBlur = 0;
         });
         if(activeWireStart && mE) {
             const wR = workspace.getBoundingClientRect();
-            ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = '#2196F3'; ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = '#03a9f4'; ctx.setLineDash([5, 5]);
             ctx.moveTo(activeWireStart.x, activeWireStart.y); ctx.lineTo(mE.clientX - wR.left, mE.clientY - wR.top);
             ctx.stroke(); ctx.setLineDash([]);
         }
@@ -448,6 +498,11 @@
             if(comp.type === 'CLOCK') { input.min = 100; input.max = 5000; }
             input.oninput = () => { comp.value = parseFloat(input.value); updateSimulation(); };
             propsContent.appendChild(input);
+            const valLabel = document.createElement('div');
+            valLabel.style.fontSize = '12px'; valLabel.style.marginTop = '5px';
+            valLabel.innerText = "Value: " + comp.value;
+            propsContent.appendChild(valLabel);
+            input.addEventListener('input', () => { valLabel.innerText = "Value: " + input.value; });
         } else { propsContent.innerText = "No adjustable properties."; }
     }
 
