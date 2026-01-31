@@ -40,7 +40,7 @@
         }
 
         /* Workspace */
-        #workspace-container { flex-grow: 1; position: relative; overflow: hidden; background-color: #0a0a0a; }
+        #workspace-container { flex-grow: 1; position: relative; overflow: hidden; background-color: #0a0a0a; cursor: default; }
         #workspace {
             position: absolute; width: 5000px; height: 5000px; top: 0; left: 0;
             background-image: radial-gradient(#222 1px, transparent 1px); background-size: 25px 25px; transform-origin: 0 0;
@@ -55,7 +55,6 @@
         }
         .component.selected { border-color: var(--accent-color); box-shadow: 0 0 15px rgba(3, 169, 244, 0.3); }
         
-        /* Category-specific glows */
         .component.gate { border-color: #ff9800; }
         .component.power { border-color: #4caf50; }
         .component.timing { border-color: #9c27b0; }
@@ -96,6 +95,11 @@
         .light-bulb { width: 24px; height: 24px; border-radius: 50% 50% 40% 40%; background: #333; border: 2px solid #222; transition: 0.2s; }
         .fuse-wire { width: 30px; height: 4px; background: #4fc3f7; border-radius: 2px; }
         .fuse-wire.blown { background: #222; text-decoration: line-through; opacity: 0.3; }
+
+        /* Capacitor Visuals */
+        .capacitor-plates { display: flex; justify-content: center; align-items: center; gap: 4px; height: 40px; position: relative; }
+        .plate { width: 4px; height: 30px; background: #bbb; border-radius: 2px; z-index: 2; }
+        .cap-fill { position: absolute; bottom: 0; width: 100%; background: rgba(3, 169, 244, 0.4); transition: height 0.1s linear; pointer-events: none; }
 
         .seven-seg { display: grid; grid-template-areas: " . a . " " f . b " " . g . " " e . c " " . d . "; gap: 2px; background: #000; padding: 4px; border-radius: 4px; }
         .seg { background: #1a1a1a; border-radius: 1px; }
@@ -150,6 +154,7 @@
 
         <h3>Analog & Load</h3>
         <div class="tool-item" draggable="true" data-type="RESISTOR"><div class="tool-icon">Ω</div><span>Resistor</span></div>
+        <div class="tool-item" draggable="true" data-type="CAPACITOR"><div class="tool-icon">| |</div><span>Capacitor</span></div>
         <div class="tool-item" draggable="true" data-type="FUSE"><div class="tool-icon">〰</div><span>Fuse</span></div>
         <div class="tool-item" draggable="true" data-type="LIGHT"><div class="tool-icon">💡</div><span>Light Bulb</span></div>
         <div class="tool-item" draggable="true" data-type="DELAY"><div class="tool-icon">⏳</div><span>Delay</span></div>
@@ -174,7 +179,6 @@
 </div>
 
 <script>
-    // Logic remains identical to ensure no features are lost
     const container = document.getElementById('workspace-container');
     const workspace = document.getElementById('workspace');
     const canvas = document.getElementById('wireCanvas');
@@ -187,14 +191,78 @@
     let activeWireStart = null;
     let dragComponent = null;
     let selectedComponent = null;
+    let selectedWire = null;
     let offset = { x: 0, y: 0 };
+
+    // Transformation state
+    let view = { x: 0, y: 0, zoom: 1 };
+    let isPanning = false;
+    let lastMousePos = { x: 0, y: 0 };
+
+    function updateTransform() {
+        workspace.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`;
+    }
+
+    function screenToWorkspace(screenX, screenY) {
+        const rect = container.getBoundingClientRect();
+        return {
+            x: (screenX - rect.left - view.x) / view.zoom,
+            y: (screenY - rect.top - view.y) / view.zoom
+        };
+    }
+
+    // Keyboard controls
+    window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+            e.preventDefault();
+            if (selectedComponent) duplicateComponent(selectedComponent);
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            if (selectedWire) {
+                wires = wires.filter(w => w !== selectedWire);
+                selectedWire = null;
+                updateSimulation();
+            } else if (selectedComponent) {
+                selectedComponent.destroy();
+                selectedComponent = null;
+            }
+        }
+    });
+
+    // Zoom handler
+    container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.08;
+        const delta = -Math.sign(e.deltaY) * zoomSpeed;
+        const newZoom = Math.min(Math.max(view.zoom + delta, 0.1), 3);
+
+        const mouse = { x: e.clientX, y: e.clientY };
+        const rect = container.getBoundingClientRect();
+        const wx = (mouse.x - rect.left - view.x) / view.zoom;
+        const wy = (mouse.y - rect.top - view.y) / view.zoom;
+
+        view.zoom = newZoom;
+        view.x = mouse.x - rect.left - wx * view.zoom;
+        view.y = mouse.y - rect.top - wy * view.zoom;
+        
+        updateTransform();
+    }, { passive: false });
+
+    function duplicateComponent(comp) {
+        if (!comp) return;
+        const clone = new Component(comp.type, comp.x + 30, comp.y + 30);
+        clone.value = comp.value;
+        components.push(clone);
+        selectComponent(clone);
+        updateSimulation();
+    }
 
     class Component {
         constructor(type, x, y) {
             this.id = 'c' + Math.random().toString(36).substr(2, 5);
             this.type = type;
             this.x = x; this.y = y;
-            this.state = false;
+            this.state = 0; // Used for voltage storage in capacitor
             this.blown = false;
             this.lastClockState = false;
             this.value = this.getDefaultValue();
@@ -212,6 +280,7 @@
                 case 'FUSE': return 2.0;
                 case 'CLOCK': return 1000;
                 case 'DELAY': return 400;
+                case 'CAPACITOR': return 0.1; // Charge speed
                 default: return 0;
             }
         }
@@ -220,7 +289,7 @@
             if(['AND','OR','NOT','XOR','NAND','NOR','XNOR'].includes(this.type)) return 'gate';
             if(['SR_LATCH','D_FF'].includes(this.type)) return 'timing';
             if(['BATTERY','SWITCH','BUTTON'].includes(this.type)) return 'power';
-            if(['CLOCK','DELAY'].includes(this.type)) return 'timing';
+            if(['CLOCK','DELAY','CAPACITOR'].includes(this.type)) return 'timing';
             if(['VOLTMETER','AMMETER','7SEG'].includes(this.type)) return 'meter';
             return '';
         }
@@ -231,6 +300,7 @@
                 'SWITCH': { in: 1, out: 1 }, 'BUTTON': { in: 0, out: 1 },
                 'RESISTOR': { in: 1, out: 1 }, 'FUSE': { in: 1, out: 1 },
                 'LIGHT': { in: 1, out: 1 }, 'DELAY': { in: 1, out: 1 },
+                'CAPACITOR': { in: 1, out: 1 },
                 'VOLTMETER': { in: 2, out: 0 }, 'AMMETER': { in: 1, out: 1 },
                 '7SEG': { in: 7, out: 0 }, 
                 'AND': { in: 2, out: 1 }, 'OR': { in: 2, out: 1 }, 
@@ -265,12 +335,21 @@
             this.addVisuals(div);
 
             div.onmousedown = (e) => {
-                if(e.target.classList.contains('node') || e.target.closest('.interactive')) return;
+                if(e.button !== 0 || e.target.classList.contains('node') || e.target.closest('.interactive')) return;
+                e.stopPropagation();
                 selectComponent(this);
+                selectedWire = null;
                 dragComponent = this;
-                offset.x = e.clientX - this.x;
-                offset.y = e.clientY - this.y;
+                const pos = screenToWorkspace(e.clientX, e.clientY);
+                offset.x = pos.x - this.x;
+                offset.y = pos.y - this.y;
             };
+
+            div.oncontextmenu = (e) => {
+                e.preventDefault();
+                duplicateComponent(this);
+            };
+
             return div;
         }
 
@@ -281,7 +360,7 @@
             node.dataset.idx = idx;
             node.style.top = `${(idx + 1) * (100 / (total + 1))}%`;
             node.style.marginTop = '-6px';
-            node.onmousedown = (e) => startWire(e, node);
+            node.onmousedown = (e) => { e.stopPropagation(); startWire(e, node); };
             parent.appendChild(node);
         }
 
@@ -294,8 +373,8 @@
             } else if(this.type === 'BUTTON') {
                 const b = document.createElement('div');
                 b.className = 'btn-momentary interactive';
-                b.onmousedown = () => { this.state = true; updateSimulation(); };
-                b.onmouseup = () => { this.state = false; updateSimulation(); };
+                b.onmousedown = () => { this.state = 1; updateSimulation(); };
+                b.onmouseup = () => { this.state = 0; updateSimulation(); };
                 div.appendChild(b);
             } else if(this.type === 'LIGHT') {
                 const l = document.createElement('div');
@@ -305,6 +384,15 @@
                 const f = document.createElement('div');
                 f.className = 'fuse-wire';
                 div.appendChild(f);
+            } else if(this.type === 'CAPACITOR') {
+                const cont = document.createElement('div');
+                cont.className = 'capacitor-plates';
+                const p1 = document.createElement('div'); p1.className = 'plate';
+                const p2 = document.createElement('div'); p2.className = 'plate';
+                cont.appendChild(p1); cont.appendChild(p2);
+                const fill = document.createElement('div');
+                fill.className = 'cap-fill'; fill.id = `${this.id}-fill`;
+                div.appendChild(fill); div.appendChild(cont);
             } else if(['VOLTMETER', 'AMMETER'].includes(this.type)) {
                 const r = document.createElement('div');
                 r.className = 'readout'; r.innerText = '0.00';
@@ -315,8 +403,7 @@
                 ['a','f','b','g','e','c','d'].forEach(seg => {
                     const sd = document.createElement('div');
                     sd.className = `seg seg-${['a','g','d'].includes(seg)?'h':'v'}`;
-                    sd.style.gridArea = seg;
-                    sd.id = `${this.id}-${seg}`;
+                    sd.style.gridArea = seg; sd.id = `${this.id}-${seg}`;
                     sCont.appendChild(sd);
                 });
                 div.appendChild(sCont);
@@ -324,10 +411,8 @@
                 const sym = document.createElement('div');
                 sym.style.fontSize = '16px'; sym.style.fontWeight = 'bold'; sym.style.color = 'white';
                 const symbols = {
-                    'AND':'&','OR':'≥1','NOT':'1','XOR':'=1',
-                    'NAND':'!&', 'NOR':'!≥', 'XNOR':'!X',
-                    'RESISTOR':'Ω','BATTERY':'🔋','CLOCK':'⏱','DELAY':'⏳',
-                    'SR_LATCH':'SR', 'D_FF':'DFF'
+                    'AND':'&','OR':'≥1','NOT':'1','XOR':'=1','NAND':'!&','NOR':'!≥','XNOR':'!X',
+                    'RESISTOR':'Ω','BATTERY':'🔋','CLOCK':'⏱','DELAY':'⏳','SR_LATCH':'SR','D_FF':'DFF'
                 };
                 sym.innerText = symbols[this.type] || '';
                 div.appendChild(sym);
@@ -337,20 +422,20 @@
         updatePosition() { this.element.style.left = this.x + 'px'; this.element.style.top = this.y + 'px'; }
         destroy() {
             wires = wires.filter(w => w.from !== this && w.to !== this);
-            workspace.removeChild(this.element);
+            if(workspace.contains(this.element)) workspace.removeChild(this.element);
             components = components.filter(c => c !== this);
             updateSimulation();
         }
     }
 
     function startWire(e, nodeEl) {
-        e.stopPropagation();
         const rect = nodeEl.getBoundingClientRect();
         const wRect = workspace.getBoundingClientRect();
         activeWireStart = {
             compId: nodeEl.dataset.compId, idx: nodeEl.dataset.idx,
             isOut: nodeEl.classList.contains('output'),
-            x: rect.left + 6 - wRect.left, y: rect.top + 6 - wRect.top
+            x: (rect.left + 6 - wRect.left) / view.zoom, 
+            y: (rect.top + 6 - wRect.top) / view.zoom
         };
     }
 
@@ -366,6 +451,68 @@
         activeWireStart = null; updateSimulation();
     }
 
+    function checkWireClick(wx, wy) {
+        selectedWire = null;
+        wires.forEach(w => {
+            const sN = w.from.element.querySelectorAll('.node.output')[0];
+            const eN = w.to.element.querySelectorAll('.node.input')[w.toIdx];
+            if(!sN || !eN) return;
+            const sR = sN.getBoundingClientRect(), eR = eN.getBoundingClientRect(), wR = workspace.getBoundingClientRect();
+            const x1 = (sR.left + 6 - wR.left) / view.zoom;
+            const y1 = (sR.top + 6 - wR.top) / view.zoom;
+            const x2 = (eR.left + 6 - wR.left) / view.zoom;
+            const y2 = (eR.top + 6 - wR.top) / view.zoom;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+            const dist = Math.sqrt((wx - midX)**2 + (wy - midY)**2);
+            if (dist < 20) selectedWire = w; 
+        });
+        drawWires();
+    }
+
+    container.onmousedown = (e) => {
+        if (e.button !== 0) return;
+        if (e.target === container || e.target === canvas || e.target === workspace) {
+            isPanning = true;
+            lastMousePos = { x: e.clientX, y: e.clientY };
+            container.style.cursor = 'grabbing';
+            const pos = screenToWorkspace(e.clientX, e.clientY);
+            checkWireClick(pos.x, pos.y);
+            if (selectedComponent) {
+                selectedComponent.element.classList.remove('selected');
+                selectedComponent = null;
+                propsPanel.style.display = 'none';
+            }
+        }
+    };
+
+    window.onmousemove = (e) => {
+        if (isPanning) {
+            view.x += e.clientX - lastMousePos.x;
+            view.y += e.clientY - lastMousePos.y;
+            lastMousePos = { x: e.clientX, y: e.clientY };
+            updateTransform();
+            return;
+        }
+        if(dragComponent) {
+            const pos = screenToWorkspace(e.clientX, e.clientY);
+            dragComponent.x = pos.x - offset.x;
+            dragComponent.y = pos.y - offset.y;
+            dragComponent.updatePosition();
+            drawWires();
+        }
+        if(activeWireStart) drawWires(e);
+    };
+
+    window.onmouseup = (e) => {
+        if (isPanning) {
+            isPanning = false;
+            container.style.cursor = 'default';
+        }
+        if(activeWireStart && e.target.classList.contains('node')) completeWire(e, e.target);
+        activeWireStart = null; dragComponent = null;
+    };
+
     function updateSimulation() {
         components.forEach(c => c.inputVals.fill(0));
         const isHigh = (v) => v > 2.0;
@@ -374,7 +521,6 @@
             components.forEach(c => {
                 const incoming = wires.filter(w => w.to === c);
                 incoming.forEach(w => c.inputVals[w.toIdx] = w.from.voltageOut);
-                
                 if(c.blown) { c.voltageOut = 0; return; }
 
                 switch(c.type) {
@@ -383,6 +529,15 @@
                     case 'SWITCH': c.voltageOut = c.state ? c.inputVals[0] : 0; break;
                     case 'BUTTON': c.voltageOut = c.state ? 9 : 0; break;
                     case 'RESISTOR': c.voltageOut = Math.max(0, c.inputVals[0] * (1 - (c.value/100))); break;
+                    case 'CAPACITOR':
+                        const inputVolt = c.inputVals[0];
+                        if (inputVolt > c.state) c.state += (inputVolt - c.state) * c.value;
+                        else c.state -= (c.state * c.value * 0.5);
+                        if (c.state < 0.1) c.state = 0;
+                        c.voltageOut = c.state;
+                        const fillEl = document.getElementById(`${c.id}-fill`);
+                        if (fillEl) fillEl.style.height = Math.min((c.state / 9) * 100, 100) + '%';
+                        break;
                     case 'FUSE': 
                         c.voltageOut = c.inputVals[0];
                         if(c.voltageOut/5 > c.value && !c.blown) {
@@ -407,21 +562,18 @@
                     case 'NOR':  c.voltageOut = !(isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; break;
                     case 'XNOR': c.voltageOut = (isHigh(c.inputVals[0]) === isHigh(c.inputVals[1])) ? 9 : 0; break;
                     case 'SR_LATCH':
-                        if (isHigh(c.inputVals[0])) c.state = true;
-                        if (isHigh(c.inputVals[1])) c.state = false;
+                        if (isHigh(c.inputVals[0])) c.state = 1;
+                        if (isHigh(c.inputVals[1])) c.state = 0;
                         c.voltageOut = c.state ? 9 : 0;
                         break;
                     case 'D_FF':
                         const clockNow = isHigh(c.inputVals[1]);
-                        if (!c.lastClockState && clockNow) {
-                            c.state = isHigh(c.inputVals[0]);
-                        }
+                        if (!c.lastClockState && clockNow) c.state = isHigh(c.inputVals[0]) ? 1 : 0;
                         c.lastClockState = clockNow;
                         c.voltageOut = c.state ? 9 : 0;
                         break;
                     case 'VOLTMETER':
-                        const diff = Math.abs(c.inputVals[0] - c.inputVals[1]);
-                        c.element.querySelector('.readout').innerText = diff.toFixed(2) + 'V';
+                        c.element.querySelector('.readout').innerText = Math.abs(c.inputVals[0] - c.inputVals[1]).toFixed(2) + 'V';
                         break;
                     case 'AMMETER':
                         c.voltageOut = c.inputVals[0];
@@ -447,18 +599,21 @@
             const eN = w.to.element.querySelectorAll('.node.input')[w.toIdx];
             if(!sN || !eN) return;
             const sR = sN.getBoundingClientRect(), eR = eN.getBoundingClientRect(), wR = workspace.getBoundingClientRect();
-            const x1 = sR.left + 6 - wR.left, y1 = sR.top + 6 - wR.top, x2 = eR.left + 6 - wR.left, y2 = eR.top + 6 - wR.top;
+            const x1 = (sR.left + 6 - wR.left) / view.zoom;
+            const y1 = (sR.top + 6 - wR.top) / view.zoom;
+            const x2 = (eR.left + 6 - wR.left) / view.zoom;
+            const y2 = (eR.top + 6 - wR.top) / view.zoom;
             ctx.beginPath(); ctx.lineWidth = 4;
-            ctx.strokeStyle = w.from.voltageOut > 2 ? '#ffee58' : '#37474f';
-            ctx.shadowBlur = w.from.voltageOut > 2 ? 8 : 0;
-            ctx.shadowColor = '#ffee58';
+            if (w === selectedWire) { ctx.strokeStyle = '#ff5252'; ctx.shadowBlur = 10; }
+            else { ctx.strokeStyle = w.from.voltageOut > 2 ? '#ffee58' : '#37474f'; ctx.shadowBlur = w.from.voltageOut > 2 ? 8 : 0; }
+            ctx.shadowColor = ctx.strokeStyle;
             ctx.moveTo(x1, y1); ctx.bezierCurveTo(x1 + 40, y1, x2 - 40, y2, x2, y2); ctx.stroke();
             ctx.shadowBlur = 0;
         });
         if(activeWireStart && mE) {
-            const wR = workspace.getBoundingClientRect();
+            const pos = screenToWorkspace(mE.clientX, mE.clientY);
             ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = '#03a9f4'; ctx.setLineDash([5, 5]);
-            ctx.moveTo(activeWireStart.x, activeWireStart.y); ctx.lineTo(mE.clientX - wR.left, mE.clientY - wR.top);
+            ctx.moveTo(activeWireStart.x, activeWireStart.y); ctx.lineTo(pos.x, pos.y);
             ctx.stroke(); ctx.setLineDash([]);
         }
     }
@@ -468,18 +623,9 @@
     container.ondragover = (e) => e.preventDefault();
     container.ondrop = (e) => {
         const type = e.dataTransfer.getData('type');
-        const rect = workspace.getBoundingClientRect();
-        const nc = new Component(type, e.clientX - rect.left - 40, e.clientY - rect.top - 20);
+        const pos = screenToWorkspace(e.clientX, e.clientY);
+        const nc = new Component(type, pos.x - 40, pos.y - 20);
         components.push(nc); updateSimulation();
-    };
-
-    window.onmousemove = (e) => {
-        if(dragComponent) { dragComponent.x = e.clientX - offset.x; dragComponent.y = e.clientY - offset.y; dragComponent.updatePosition(); drawWires(); }
-        if(activeWireStart) drawWires(e);
-    };
-    window.onmouseup = (e) => {
-        if(activeWireStart && e.target.classList.contains('node')) completeWire(e, e.target);
-        activeWireStart = null; dragComponent = null;
     };
 
     function clearCanvas() { components.slice().forEach(c => c.destroy()); }
@@ -492,17 +638,20 @@
     function showProperties(comp) {
         propsPanel.style.display = 'block';
         propsContent.innerHTML = '';
-        if(['BATTERY','RESISTOR','FUSE','CLOCK','DELAY'].includes(comp.type)) {
+        if(['BATTERY','RESISTOR','FUSE','CLOCK','DELAY','CAPACITOR'].includes(comp.type)) {
             const input = document.createElement('input');
-            input.type = 'range'; input.min = 1; input.max = 100; input.value = comp.value;
-            if(comp.type === 'CLOCK') { input.min = 100; input.max = 5000; }
-            input.oninput = () => { comp.value = parseFloat(input.value); updateSimulation(); };
+            input.type = 'range'; input.min = 1; input.max = 100; input.value = comp.value * 100;
+            if(comp.type === 'CLOCK') { input.min = 100; input.max = 5000; input.value = comp.value; }
+            input.oninput = () => { 
+                comp.value = (comp.type === 'CLOCK') ? parseFloat(input.value) : parseFloat(input.value) / 100; 
+                updateSimulation(); 
+            };
             propsContent.appendChild(input);
             const valLabel = document.createElement('div');
             valLabel.style.fontSize = '12px'; valLabel.style.marginTop = '5px';
             valLabel.innerText = "Value: " + comp.value;
             propsContent.appendChild(valLabel);
-            input.addEventListener('input', () => { valLabel.innerText = "Value: " + input.value; });
+            input.addEventListener('input', () => { valLabel.innerText = "Value: " + (comp.type === 'CLOCK' ? input.value : input.value/100); });
         } else { propsContent.innerText = "No adjustable properties."; }
     }
 
