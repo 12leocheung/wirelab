@@ -165,6 +165,7 @@
             cursor: default;
             margin-left: var(--sidebar-width);
             transition: margin-left 0.3s ease;
+            touch-action: none;
         }
         #workspace-container.expanded {
             margin-left: 0;
@@ -178,6 +179,7 @@
             background-image: radial-gradient(#222 1px, transparent 1px); 
             background-size: 25px 25px; 
             transform-origin: 0 0;
+            touch-action: none;
         }
         canvas { 
             position: absolute; 
@@ -722,6 +724,35 @@
                 isDragging = this;
                 selectComponent(this);
             };
+            // Touch support: start dragging on touch
+            this.element.ontouchstart = (e) => {
+                e.preventDefault();
+                if(e.touches && e.touches.length > 0) {
+                    const t = e.touches[0];
+                    dragOffsetX = (t.clientX / view.zoom) - this.x;
+                    dragOffsetY = (t.clientY / view.zoom) - this.y;
+                    isDragging = this;
+                    selectComponent(this);
+                }
+            };
+            this.element.ontouchmove = (e) => {
+                e.preventDefault();
+                if(isDragging === this && e.touches && e.touches.length > 0) {
+                    const t = e.touches[0];
+                    const newX = (t.clientX / view.zoom) - dragOffsetX;
+                    const newY = (t.clientY / view.zoom) - dragOffsetY;
+                    this.x = newX; this.y = newY;
+                    this.element.style.left = newX + 'px';
+                    this.element.style.top = newY + 'px';
+                    drawWires();
+                }
+            };
+            this.element.ontouchend = (e) => {
+                e.preventDefault();
+                if(isDragging === this) {
+                    isDragging = false;
+                }
+            };
         }
 
         initContent() {
@@ -941,6 +972,131 @@
         workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
         drawWires();
     };
+
+    // ============ TOUCH HANDLERS ============
+    let isTouchPanning = false;
+    let isPinching = false;
+    let pinchStartDist = 0;
+    let pinchStartZoom = 1;
+    let pinchMidX = 0;
+    let pinchMidY = 0;
+
+    function getTouchDistance(t0, t1) {
+        return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+    }
+
+    container.addEventListener('touchstart', (ev) => {
+        if(ev.touches.length === 1) {
+            const t = ev.touches[0];
+            // If touch on a tool-item (mobile) allow tap-to-place via existing click handlers
+            const el = document.elementFromPoint(t.clientX, t.clientY);
+            if(el && el.closest && el.closest('.tool-item')) {
+                // let the click handler (onclick) handle selection; emulate click
+                el.closest('.tool-item').click();
+                return;
+            }
+
+            // If clickPlaceMode is active and user taps workspace -> place the component
+            if(clickPlaceMode && selectedToolType) {
+                ev.preventDefault();
+                const pos = screenToWorkspace(t.clientX, t.clientY);
+                const nc = new Component(selectedToolType, pos.x - 40, pos.y - 20);
+                components.push(nc);
+                updateSimulation();
+                return;
+            }
+
+            // Check if touch started on a component to drag it
+            const targetEl = document.elementFromPoint(t.clientX, t.clientY);
+            const compEl = targetEl && targetEl.closest ? targetEl.closest('.component') : null;
+            if(compEl) {
+                ev.preventDefault();
+                const comp = components.find(c => c.element === compEl || c.element.dataset.id === compEl.dataset.id);
+                if(comp) {
+                    isDragging = comp;
+                    dragOffsetX = (t.clientX / view.zoom) - comp.x;
+                    dragOffsetY = (t.clientY / view.zoom) - comp.y;
+                    selectComponent(comp);
+                    return;
+                }
+            }
+
+            // Otherwise start panning
+            isTouchPanning = true;
+            panStartX = t.clientX;
+            panStartY = t.clientY;
+            ev.preventDefault();
+        } else if(ev.touches.length === 2) {
+            // Pinch start
+            isPinching = true;
+            isTouchPanning = false;
+            const t0 = ev.touches[0], t1 = ev.touches[1];
+            pinchStartDist = getTouchDistance(t0, t1);
+            pinchStartZoom = view.zoom;
+            pinchMidX = (t0.clientX + t1.clientX) / 2;
+            pinchMidY = (t0.clientY + t1.clientY) / 2;
+            ev.preventDefault();
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', (ev) => {
+        if(isPinching && ev.touches.length === 2) {
+            const t0 = ev.touches[0], t1 = ev.touches[1];
+            const newDist = getTouchDistance(t0, t1);
+            let newZoom = pinchStartZoom * (newDist / pinchStartDist);
+            newZoom = Math.max(0.1, Math.min(3, newZoom));
+
+            const rect = container.getBoundingClientRect();
+            const x = pinchMidX - rect.left;
+            const y = pinchMidY - rect.top;
+            const oldZoom = view.zoom;
+            view.zoom = newZoom;
+            view.panX -= x * (view.zoom - oldZoom) / oldZoom;
+            view.panY -= y * (view.zoom - oldZoom) / oldZoom;
+            workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
+            drawWires();
+            ev.preventDefault();
+            return;
+        }
+
+        if(ev.touches.length === 1) {
+            const t = ev.touches[0];
+            if(isDragging) {
+                // dragging a component
+                const newX = (t.clientX / view.zoom) - dragOffsetX;
+                const newY = (t.clientY / view.zoom) - dragOffsetY;
+                isDragging.x = newX; isDragging.y = newY;
+                isDragging.element.style.left = newX + 'px';
+                isDragging.element.style.top = newY + 'px';
+                drawWires();
+                ev.preventDefault();
+                return;
+            }
+
+            if(isTouchPanning) {
+                const deltaX = t.clientX - panStartX;
+                const deltaY = t.clientY - panStartY;
+                view.panX += deltaX;
+                view.panY += deltaY;
+                panStartX = t.clientX;
+                panStartY = t.clientY;
+                workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
+                drawWires();
+                ev.preventDefault();
+                return;
+            }
+        }
+    }, { passive: false });
+
+    container.addEventListener('touchend', (ev) => {
+        // Clear states when fingers lifted
+        if(ev.touches.length === 0) {
+            isPinching = false;
+            isTouchPanning = false;
+            if(isDragging) isDragging = false;
+            drawWires();
+        }
+    });
 
     document.onkeydown = (e) => {
         if(e.key === 'Delete' && selectedComponent) {
