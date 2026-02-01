@@ -344,7 +344,14 @@
         /* Refined 7-Segment visuals */
         .seven-seg { 
             display: grid; 
-            grid-template-areas: " . a . " " f . b " " . g . " " e . c " " . d . "; 
+            grid-template-columns: 4px 1fr 4px;
+            grid-template-rows: 4px 1fr 4px 1fr 4px;
+            grid-template-areas: 
+                ". a ." 
+                "f . b" 
+                ". g ." 
+                "e . c" 
+                ". d ."; 
             gap: 2px; 
             background: #000; 
             padding: 8px; 
@@ -367,13 +374,76 @@
             position: absolute; 
             right: 20px; 
             top: 20px; 
-            width: 200px;
-            background: #1e1e1e; 
-            border: 2px solid #444; 
-            border-radius: 10px; 
-            padding: 12px; 
+            width: 280px;
+            background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+            border: 2px solid var(--accent-color); 
+            border-radius: 12px; 
+            padding: 16px; 
             display: none; 
             z-index: 100;
+            box-shadow: 0 8px 32px rgba(3, 169, 244, 0.2);
+        }
+        
+        #props-panel h3 {
+            margin: 0 0 12px 0;
+            color: var(--accent-color);
+            font-size: 0.95rem;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 8px;
+        }
+        
+        #zoom-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(30, 30, 30, 0.9);
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 11px;
+            color: #888;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+        
+        #zoom-info strong {
+            color: var(--accent-color);
+        }
+        
+        .prop-row {
+            margin-bottom: 14px;
+        }
+        
+        .prop-label {
+            font-size: 11px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            display: block;
+        }
+        
+        .prop-input {
+            width: 100%;
+            padding: 8px 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: var(--accent-color);
+            font-size: 12px;
+        }
+        
+        .prop-input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 8px rgba(3, 169, 244, 0.3);
+        }
+        
+        .prop-value {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            font-family: 'Courier New', monospace;
         }
         .delete-btn {
             position: absolute; 
@@ -533,8 +603,10 @@
             <canvas id="wireCanvas"></canvas>
         </div>
         <div id="props-panel">
-            <h2 style="margin-top: 0; padding-top: 0; font-size: 0.9rem;">Properties</h2>
             <div id="props-content"></div>
+        </div>
+        <div id="zoom-info">
+            <strong>Scroll</strong> to zoom • <strong>Middle-click + drag</strong> or <strong>Shift + click</strong> to pan
         </div>
     </div>
 </div>
@@ -553,14 +625,13 @@
     let components = [], wires = [], view = { zoom: 1, panX: 0, panY: 0 };
     let isDragging = false, activeWireStart = null, selectedComponent = null, selectedWire = null;
     let dragOffsetX = 0, dragOffsetY = 0;
+    let simulationRunning = true;
 
     // Toggle Sidebar
     function toggleSidebar() {
         toolbox.classList.toggle('collapsed');
         menuToggle.classList.toggle('active');
         container.classList.toggle('expanded');
-        
-        // Handle overlay for mobile
         if (window.innerWidth <= 768) {
             sidebarOverlay.classList.toggle('active');
         }
@@ -569,7 +640,6 @@
     menuToggle.addEventListener('click', toggleSidebar);
     sidebarOverlay.addEventListener('click', toggleSidebar);
 
-    // Close sidebar on mobile when dragging a component
     document.querySelectorAll('.tool-item').forEach(item => {
         item.addEventListener('dragstart', () => {
             if (window.innerWidth <= 768 && !toolbox.classList.contains('collapsed')) {
@@ -578,29 +648,38 @@
         });
     });
 
-    // Auto-collapse sidebar on mobile by default
     if (window.innerWidth <= 768) {
         toolbox.classList.add('collapsed');
     }
 
-    // Handle window resize
     window.addEventListener('resize', () => {
         if (window.innerWidth > 768) {
             sidebarOverlay.classList.remove('active');
         }
     });
 
+    // ============ COMPONENT CLASS ============
     class Component {
         constructor(type, x, y) {
             this.type = type;
             this.id = `c${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            this.x = x; this.y = y;
-            this.inputVals = [0, 0, 0, 0, 0, 0, 0];
+            this.x = x; 
+            this.y = y;
+            this.inputVals = [0, 0, 0, 0, 0, 0, 0, 0];
             this.voltageOut = 0;
             this.value = 0.5;
             this.state = 0;
+            this.prevState = 0;
             this.blown = false;
             this.lastClockState = false;
+            this.frequency = 1000; // For clock
+            this.inductance = 0.5; // For inductor-like behavior
+            this.resistance = 100; // For resistor value in ohms
+            this.capacitance = 0.5; // For capacitor charge rate
+            this.delayTime = 500; // For delay component
+            this.pulseWidth = 50; // For PWM
+            this.counterValue = 0; // For counters
+            this.registeredValue = 0; // For latches
             
             this.element = document.createElement('div');
             this.element.className = 'component';
@@ -613,13 +692,14 @@
             label.innerText = type.replace('_', ' ');
             this.element.appendChild(label);
 
-            if(['BATTERY','CLOCK','RESISTOR','FUSE','DELAY','CAPACITOR'].includes(type)) {
+            // Add colored borders based on type
+            if(['BATTERY','CLOCK','RESISTOR','FUSE','DELAY','CAPACITOR','INDUCTOR'].includes(type)) {
                 this.element.classList.add('power');
             } else if(['AND','OR','NOT','XOR','NAND','NOR','XNOR'].includes(type)) {
                 this.element.classList.add('gate');
-            } else if(['SR_LATCH','D_FF'].includes(type)) {
+            } else if(['SR_LATCH','D_FF','JK_FF','T_FF','COUNTER'].includes(type)) {
                 this.element.classList.add('timing');
-            } else if(['VOLTMETER','AMMETER'].includes(type)) {
+            } else if(['VOLTMETER','AMMETER','OSCILLOSCOPE'].includes(type)) {
                 this.element.classList.add('meter');
             } else if(type === '7SEG') {
                 this.element.classList.add('display-7seg');
@@ -656,15 +736,17 @@
             } else if(type === 'BUTTON') {
                 const btn = document.createElement('div');
                 btn.className = 'btn-momentary';
-                btn.onmousedown = () => { this.state = true; updateSimulation(); };
-                btn.onmouseup = btn.onmouseleave = () => { this.state = false; updateSimulation(); };
+                btn.onmousedown = () => { this.state = 1; updateSimulation(); };
+                btn.onmouseup = btn.onmouseleave = () => { this.state = 0; updateSimulation(); };
                 this.element.appendChild(btn);
                 this.addNodes(0, 1);
             } else if(type === 'LIGHT') {
                 const bulb = document.createElement('div');
                 bulb.className = 'light-bulb';
+                bulb.style.background = '#333';
+                bulb.style.boxShadow = 'none';
                 this.element.appendChild(bulb);
-                this.addNodes(1, 1);
+                this.addNodes(1, 0);
             } else if(type === 'CAPACITOR') {
                 const plates = document.createElement('div');
                 plates.className = 'capacitor-plates';
@@ -676,12 +758,23 @@
                 fuse.className = 'fuse-wire';
                 this.element.appendChild(fuse);
                 this.addNodes(1, 1);
-            } else if(['VOLTMETER','AMMETER'].includes(type)) {
+            } else if(type === 'RESISTOR') {
+                const res = document.createElement('div');
+                res.style.cssText = 'width: 40px; height: 12px; border: 2px solid #bbb; border-radius: 2px;';
+                this.element.appendChild(res);
+                this.addNodes(1, 1);
+            } else if(type === 'INDUCTOR') {
+                const ind = document.createElement('div');
+                ind.style.cssText = 'width: 40px; height: 16px; border-top: 3px solid #bbb; border-radius: 8px 8px 0 0;';
+                this.element.appendChild(ind);
+                this.addNodes(1, 1);
+            } else if(['VOLTMETER','AMMETER','OSCILLOSCOPE'].includes(type)) {
                 const readout = document.createElement('div');
                 readout.className = 'readout';
-                readout.innerText = '0.00' + (type === 'VOLTMETER' ? 'V' : 'A');
+                readout.id = `${this.id}-readout`;
+                readout.innerText = '0.00' + (type === 'VOLTMETER' ? 'V' : type === 'OSCILLOSCOPE' ? '~' : 'A');
                 this.element.appendChild(readout);
-                this.addNodes(type === 'VOLTMETER' ? 2 : 1, type === 'AMMETER' ? 1 : 0);
+                this.addNodes(type === 'VOLTMETER' ? 2 : 1, 0);
             } else if(type === '7SEG') {
                 const seg = document.createElement('div');
                 seg.className = 'seven-seg';
@@ -698,10 +791,12 @@
                 this.addNodes(2, 1);
             } else if(type === 'NOT') {
                 this.addNodes(1, 1);
-            } else if(type === 'SR_LATCH') {
+            } else if(['SR_LATCH','COUNTER'].includes(type)) {
                 this.addNodes(2, 1);
-            } else if(type === 'D_FF') {
+            } else if(['D_FF','JK_FF','T_FF'].includes(type)) {
                 this.addNodes(2, 1);
+            } else if(type === 'DELAY') {
+                this.addNodes(1, 1);
             } else {
                 this.addNodes(type === 'BATTERY' || type === 'CLOCK' ? 0 : 1, 1);
             }
@@ -709,7 +804,6 @@
 
         addNodes(inputs, outputs) {
             const nodeSpacing = inputs > 1 ? 15 : 20; 
-            // Move nodes up: Start at 5px from top instead of 12/20
             const startOffset = inputs > 1 ? 5 : 20; 
             
             for(let i = 0; i < inputs; i++) {
@@ -720,22 +814,25 @@
                 node.onmousedown = (e) => {
                     e.stopPropagation();
                     const existing = wires.find(w => w.to === this && w.toIdx === i);
-                    if(existing) { selectedWire = existing; }
+                    if(existing) { 
+                        selectedWire = existing;
+                    }
                 };
                 node.onmouseup = (e) => {
                     e.stopPropagation();
                     if(activeWireStart) {
-                        wires.push({ from: activeWireStart.comp, to: this, toIdx: i });
+                        const comp = this;
+                        wires.push({ from: activeWireStart.comp, fromIdx: 0, to: comp, toIdx: i, color: null });
                         activeWireStart = null;
                         updateSimulation();
                     }
                 };
                 this.element.appendChild(node);
             }
+            
             for(let i = 0; i < outputs; i++) {
                 const node = document.createElement('div');
                 node.className = 'node output';
-                // Also shift output nodes to match the higher inputs
                 node.style.top = `${startOffset + Math.floor(inputs / 2) * nodeSpacing}px`; 
                 node.onmousedown = (e) => {
                     e.stopPropagation();
@@ -744,7 +841,8 @@
                     activeWireStart = {
                         comp: this,
                         x: (rect.left + 6 - workRect.left) / view.zoom,
-                        y: (rect.top + 6 - workRect.top) / view.zoom
+                        y: (rect.top + 6 - workRect.top) / view.zoom,
+                        idx: i
                     };
                 };
                 this.element.appendChild(node);
@@ -774,8 +872,21 @@
         }
     };
 
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+
     document.onmousemove = (e) => {
-        if(isDragging) {
+        if(isPanning) {
+            const deltaX = e.clientX - panStartX;
+            const deltaY = e.clientY - panStartY;
+            view.panX += deltaX;
+            view.panY += deltaY;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
+            drawWires();
+        } else if(isDragging) {
             const newX = (e.clientX / view.zoom) - dragOffsetX;
             const newY = (e.clientY / view.zoom) - dragOffsetY;
             isDragging.x = newX;
@@ -788,9 +899,46 @@
         }
     };
 
-    document.onmouseup = () => {
+    document.onmouseup = (e) => {
         isDragging = false;
+        isPanning = false;
         activeWireStart = null;
+        drawWires();
+    };
+
+    // Middle mouse button or Space+Click for panning
+    container.onmousedown = (e) => {
+        if(e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or Shift+Left click
+            e.preventDefault();
+            isPanning = true;
+            panStartX = e.clientX;
+            panStartY = e.clientY;
+            container.style.cursor = 'grabbing';
+        }
+    };
+
+    container.onmouseup = () => {
+        isPanning = false;
+        container.style.cursor = 'default';
+    };
+
+    // Mouse wheel zoom
+    container.onwheel = (e) => {
+        e.preventDefault();
+        const zoomSpeed = 0.1;
+        const rect = container.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        const oldZoom = view.zoom;
+        view.zoom += (e.deltaY > 0 ? -zoomSpeed : zoomSpeed);
+        view.zoom = Math.max(0.1, Math.min(3, view.zoom)); // Clamp zoom between 0.1x and 3x
+        
+        // Adjust pan to zoom toward mouse position
+        view.panX -= x * (view.zoom - oldZoom) / oldZoom;
+        view.panY -= y * (view.zoom - oldZoom) / oldZoom;
+        
+        workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
         drawWires();
     };
 
@@ -805,77 +953,217 @@
     };
 
     function screenToWorkspace(x, y) {
-        const rect = workspace.getBoundingClientRect();
-        return { x: (x - rect.left) / view.zoom, y: (y - rect.top) / view.zoom };
+        const rect = container.getBoundingClientRect();
+        return { 
+            x: (x - rect.left - view.panX) / view.zoom, 
+            y: (y - rect.top - view.panY) / view.zoom 
+        };
     }
 
-    function isHigh(v) { return v > 4.5; }
+    function isHigh(v) { 
+        return v > 4.5; 
+    }
 
+    function isLow(v) {
+        return v < 4.5;
+    }
+
+    // ============ SIMULATION ENGINE ============
     function updateSimulation() {
-        for(let i = 0; i < 3; i++) {
+        if (!simulationRunning) return;
+        
+        // Multi-pass simulation for propagation
+        for(let pass = 0; pass < 5; pass++) {
             components.forEach(c => {
                 const incoming = wires.filter(w => w.to === c);
                 incoming.forEach(w => c.inputVals[w.toIdx] = w.from.voltageOut);
-                if(c.blown) { c.voltageOut = 0; return; }
+                
+                if(c.blown) { 
+                    c.voltageOut = 0; 
+                    return; 
+                }
 
                 switch(c.type) {
-                    case 'BATTERY': c.voltageOut = c.value * 9; break;
-                    case 'CLOCK': c.voltageOut = (Math.floor(Date.now() / c.value) % 2 === 0) ? 9 : 0; break;
-                    case 'SWITCH': c.voltageOut = c.state ? c.inputVals[0] : 0; break;
-                    case 'BUTTON': c.voltageOut = c.state ? 9 : 0; break;
-                    case 'RESISTOR': c.voltageOut = Math.max(0, c.inputVals[0] * (1 - (c.value/100))); break;
+                    // ===== POWER & INPUT =====
+                    case 'BATTERY': 
+                        c.voltageOut = c.value * 9; 
+                        break;
+                    
+                    case 'CLOCK': 
+                        c.voltageOut = (Math.floor(Date.now() / c.frequency) % 2 === 0) ? 9 : 0; 
+                        break;
+                    
+                    case 'SWITCH': 
+                        c.voltageOut = c.state ? c.inputVals[0] : 0; 
+                        break;
+                    
+                    case 'BUTTON': 
+                        c.voltageOut = c.state ? 9 : 0; 
+                        break;
+
+                    // ===== PASSIVE COMPONENTS =====
+                    case 'RESISTOR': 
+                        const dropVoltage = c.inputVals[0] * (c.resistance / (c.resistance + 100));
+                        c.voltageOut = c.inputVals[0] - dropVoltage;
+                        break;
+                    
                     case 'CAPACITOR':
                         const inputVolt = c.inputVals[0];
-                        if (inputVolt > c.state) c.state += (inputVolt - c.state) * c.value;
-                        else c.state -= (c.state * c.value * 0.5);
+                        if (inputVolt > c.state) {
+                            c.state += (inputVolt - c.state) * c.capacitance;
+                        } else {
+                            c.state -= (c.state * c.capacitance * 0.3);
+                        }
                         if (c.state < 0.1) c.state = 0;
                         c.voltageOut = c.state;
                         const fillEl = document.getElementById(`${c.id}-fill`);
                         if (fillEl) fillEl.style.height = Math.min((c.state / 9) * 100, 100) + '%';
                         break;
+
+                    case 'INDUCTOR':
+                        c.voltageOut = c.inputVals[0] * (1 - c.inductance * 0.3);
+                        break;
+                    
                     case 'FUSE': 
                         c.voltageOut = c.inputVals[0];
-                        if(c.voltageOut/5 > c.value && !c.blown) {
-                            c.blown = true; c.element.querySelector('.fuse-wire').classList.add('blown');
+                        const fuseRating = c.value * 5;
+                        if(c.inputVals[0] > fuseRating && !c.blown) {
+                            c.blown = true;
+                            c.element.querySelector('.fuse-wire').classList.add('blown');
                         }
                         break;
+                    
                     case 'DELAY':
-                        setTimeout(() => { c.voltageOut = c.inputVals[0]; drawWires(); }, c.value);
+                        if (isHigh(c.inputVals[0]) && isLow(c.prevState)) {
+                            setTimeout(() => { 
+                                c.voltageOut = 9;
+                                setTimeout(() => { c.voltageOut = 0; }, 100);
+                            }, c.delayTime);
+                        }
+                        c.prevState = c.inputVals[0];
                         break;
+
+                    // ===== OUTPUT DEVICES =====
                     case 'LIGHT':
-                        c.voltageOut = c.inputVals[0] * 0.8;
                         const bulb = c.element.querySelector('.light-bulb');
-                        const active = isHigh(c.inputVals[0]);
-                        bulb.style.background = active ? '#fff176' : '#333';
-                        bulb.style.boxShadow = active ? '0 0 20px #fff176' : 'none';
+                        const hasConnection = wires.some(w => w.to === c);
+                        const active = hasConnection && isHigh(c.inputVals[0]);
+                        if (active) {
+                            c.voltageOut = c.inputVals[0] * 0.8;
+                            bulb.style.background = '#fff176';
+                            bulb.style.boxShadow = '0 0 20px #fff176';
+                        } else {
+                            c.voltageOut = 0;
+                            bulb.style.background = '#333';
+                            bulb.style.boxShadow = 'none';
+                        }
                         break;
-                    case 'AND': c.voltageOut = (isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; break;
-                    case 'OR':  c.voltageOut = (isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; break;
-                    case 'NOT': c.voltageOut = isHigh(c.inputVals[0]) ? 0 : 9; break;
-                    case 'XOR': c.voltageOut = (isHigh(c.inputVals[0]) !== isHigh(c.inputVals[1])) ? 9 : 0; break;
-                    case 'NAND': c.voltageOut = !(isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; break;
-                    case 'NOR':  c.voltageOut = !(isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; break;
-                    case 'XNOR': c.voltageOut = (isHigh(c.inputVals[0]) === isHigh(c.inputVals[1])) ? 9 : 0; break;
+
+                    // ===== LOGIC GATES =====
+                    case 'AND': 
+                        c.voltageOut = (isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+                    
+                    case 'OR':  
+                        c.voltageOut = (isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+                    
+                    case 'NOT': 
+                        c.voltageOut = isHigh(c.inputVals[0]) ? 0 : 9; 
+                        break;
+                    
+                    case 'XOR': 
+                        c.voltageOut = (isHigh(c.inputVals[0]) !== isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+                    
+                    case 'NAND': 
+                        c.voltageOut = !(isHigh(c.inputVals[0]) && isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+                    
+                    case 'NOR':  
+                        c.voltageOut = !(isHigh(c.inputVals[0]) || isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+                    
+                    case 'XNOR': 
+                        c.voltageOut = (isHigh(c.inputVals[0]) === isHigh(c.inputVals[1])) ? 9 : 0; 
+                        break;
+
+                    // ===== MEMORY & TIMING =====
                     case 'SR_LATCH':
-                        if (isHigh(c.inputVals[0])) c.state = 1;
-                        if (isHigh(c.inputVals[1])) c.state = 0;
+                        if (isHigh(c.inputVals[0])) c.state = 1;  // Set
+                        if (isHigh(c.inputVals[1])) c.state = 0;  // Reset
                         c.voltageOut = c.state ? 9 : 0;
                         break;
+                    
                     case 'D_FF':
                         const clockNow = isHigh(c.inputVals[1]);
-                        if (!c.lastClockState && clockNow) c.state = isHigh(c.inputVals[0]) ? 1 : 0;
+                        if (!c.lastClockState && clockNow) {
+                            c.state = isHigh(c.inputVals[0]) ? 1 : 0;
+                        }
                         c.lastClockState = clockNow;
                         c.voltageOut = c.state ? 9 : 0;
                         break;
+
+                    case 'JK_FF':
+                        const jkClock = isHigh(c.inputVals[1]);
+                        if (!c.lastClockState && jkClock) {
+                            const J = isHigh(c.inputVals[0]);
+                            const K = isHigh(c.inputVals[2] || 0);
+                            if (J && !K) c.state = 1;
+                            else if (!J && K) c.state = 0;
+                            else if (J && K) c.state = !c.state;
+                        }
+                        c.lastClockState = jkClock;
+                        c.voltageOut = c.state ? 9 : 0;
+                        break;
+
+                    case 'T_FF':
+                        const tClock = isHigh(c.inputVals[1]);
+                        if (!c.lastClockState && tClock) {
+                            if (isHigh(c.inputVals[0])) c.state = !c.state;
+                        }
+                        c.lastClockState = tClock;
+                        c.voltageOut = c.state ? 9 : 0;
+                        break;
+
+                    case 'COUNTER':
+                        const ctrClk = isHigh(c.inputVals[0]);
+                        const reset = isHigh(c.inputVals[1]);
+                        if (reset) {
+                            c.counterValue = 0;
+                        } else if (!c.lastClockState && ctrClk) {
+                            c.counterValue = (c.counterValue + 1) % 16;
+                        }
+                        c.lastClockState = ctrClk;
+                        c.voltageOut = (c.counterValue > 0) ? 9 : 0;
+                        break;
+
+                    // ===== MEASUREMENT =====
                     case 'VOLTMETER':
-                        c.element.querySelector('.readout').innerText = Math.abs(c.inputVals[0] - c.inputVals[1]).toFixed(2) + 'V';
+                        const voltage = Math.abs(c.inputVals[0] - (c.inputVals[1] || 0));
+                        const readout = c.element.querySelector('#' + c.id + '-readout');
+                        if(readout) readout.innerText = voltage.toFixed(2) + 'V';
                         break;
+                    
                     case 'AMMETER':
+                        const current = (c.inputVals[0] / 10);
+                        const amReadout = c.element.querySelector('#' + c.id + '-readout');
+                        if(amReadout) amReadout.innerText = current.toFixed(2) + 'A';
                         c.voltageOut = c.inputVals[0];
-                        c.element.querySelector('.readout').innerText = (c.inputVals[0]/10).toFixed(2) + 'A';
                         break;
+
+                    case 'OSCILLOSCOPE':
+                        const oscReadout = c.element.querySelector('#' + c.id + '-readout');
+                        if(oscReadout) oscReadout.innerText = c.inputVals[0].toFixed(1) + 'V~';
+                        break;
+
+                    // ===== DISPLAY =====
                     case '7SEG':
-                        ['a','f','b','g','e','c','d'].forEach((s, i) => {
+                        // Direct segment control: each input node controls one segment
+                        // Node 0 = a (top), 1 = f (top-left), 2 = b (top-right), 
+                        // 3 = g (middle), 4 = e (bottom-left), 5 = c (bottom-right), 6 = d (bottom)
+                        const segments = ['a','f','b','g','e','c','d'];
+                        segments.forEach((s, i) => {
                             const el = document.getElementById(`${c.id}-${s}`);
                             if(el) el.classList.toggle('on', isHigh(c.inputVals[i]));
                         });
@@ -887,72 +1175,186 @@
     }
 
     function drawWires(mE = null) {
-        canvas.width = workspace.clientWidth; canvas.height = workspace.clientHeight;
+        canvas.width = workspace.clientWidth;
+        canvas.height = workspace.clientHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
         wires.forEach(w => {
-            const sN = w.from.element.querySelectorAll('.node.output')[0];
+            const sN = w.from.element.querySelectorAll('.node.output')[w.fromIdx || 0];
             const eN = w.to.element.querySelectorAll('.node.input')[w.toIdx];
             if(!sN || !eN) return;
-            const sR = sN.getBoundingClientRect(), eR = eN.getBoundingClientRect(), wR = workspace.getBoundingClientRect();
+            
+            const sR = sN.getBoundingClientRect();
+            const eR = eN.getBoundingClientRect();
+            const wR = workspace.getBoundingClientRect();
             const x1 = (sR.left + 6 - wR.left) / view.zoom;
             const y1 = (sR.top + 6 - wR.top) / view.zoom;
             const x2 = (eR.left + 6 - wR.left) / view.zoom;
             const y2 = (eR.top + 6 - wR.top) / view.zoom;
-            ctx.beginPath(); ctx.lineWidth = 4;
-            if (w === selectedWire) { ctx.strokeStyle = '#ff5252'; ctx.shadowBlur = 10; }
-            else { ctx.strokeStyle = w.from.voltageOut > 2 ? '#ffee58' : '#37474f'; ctx.shadowBlur = w.from.voltageOut > 2 ? 8 : 0; }
+            
+            ctx.beginPath();
+            ctx.lineWidth = 4;
+            
+            if (w === selectedWire) {
+                ctx.strokeStyle = '#ff5252';
+                ctx.shadowBlur = 10;
+            } else {
+                ctx.strokeStyle = w.from.voltageOut > 4.5 ? '#ffee58' : '#37474f';
+                ctx.shadowBlur = w.from.voltageOut > 4.5 ? 8 : 0;
+            }
             ctx.shadowColor = ctx.strokeStyle;
-            ctx.moveTo(x1, y1); ctx.bezierCurveTo(x1 + 40, y1, x2 - 40, y2, x2, y2); ctx.stroke();
+            ctx.moveTo(x1, y1);
+            ctx.bezierCurveTo(x1 + 40, y1, x2 - 40, y2, x2, y2);
+            ctx.stroke();
             ctx.shadowBlur = 0;
         });
+        
         if(activeWireStart && mE) {
             const pos = screenToWorkspace(mE.clientX, mE.clientY);
-            ctx.beginPath(); ctx.lineWidth = 2; ctx.strokeStyle = '#03a9f4'; ctx.setLineDash([5, 5]);
-            ctx.moveTo(activeWireStart.x, activeWireStart.y); ctx.lineTo(pos.x, pos.y);
-            ctx.stroke(); ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = '#03a9f4';
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(activeWireStart.x, activeWireStart.y);
+            ctx.lineTo(pos.x, pos.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
         }
     }
 
-    setInterval(updateSimulation, 100);
+    let simulationInterval = setInterval(updateSimulation, 50);
 
     container.ondragover = (e) => e.preventDefault();
     container.ondrop = (e) => {
         const type = e.dataTransfer.getData('type');
         const pos = screenToWorkspace(e.clientX, e.clientY);
         const nc = new Component(type, pos.x - 40, pos.y - 20);
-        components.push(nc); updateSimulation();
+        components.push(nc);
+        updateSimulation();
     };
 
-    function clearCanvas() { components.slice().forEach(c => c.destroy()); }
+    function clearCanvas() {
+        components.slice().forEach(c => c.destroy());
+    }
+
     function selectComponent(comp) {
         if(selectedComponent) selectedComponent.element.classList.remove('selected');
-        selectedComponent = comp; comp.element.classList.add('selected');
+        selectedComponent = comp;
+        comp.element.classList.add('selected');
         showProperties(comp);
     }
 
     function showProperties(comp) {
         propsPanel.style.display = 'block';
         propsContent.innerHTML = '';
-        if(['BATTERY','RESISTOR','FUSE','CLOCK','DELAY','CAPACITOR'].includes(comp.type)) {
+        
+        const title = document.createElement('h3');
+        title.innerText = comp.type.replace(/_/g, ' ');
+        propsContent.appendChild(title);
+        
+        const propConfigs = {
+            'BATTERY': { label: 'Voltage', min: 0.1, max: 1, prop: 'value', unit: 'V' },
+            'CLOCK': { label: 'Frequency', min: 100, max: 5000, prop: 'frequency', unit: 'ms' },
+            'RESISTOR': { label: 'Resistance', min: 1, max: 1000, prop: 'resistance', unit: 'Ω' },
+            'CAPACITOR': { label: 'Capacitance', min: 0.1, max: 1, prop: 'capacitance', unit: 'F' },
+            'INDUCTOR': { label: 'Inductance', min: 0.1, max: 1, prop: 'inductance', unit: 'H' },
+            'FUSE': { label: 'Rating', min: 0.1, max: 2, prop: 'value', unit: 'A' },
+            'DELAY': { label: 'Delay', min: 0, max: 2000, prop: 'delayTime', unit: 'ms' }
+        };
+        
+        if(propConfigs[comp.type]) {
+            const cfg = propConfigs[comp.type];
+            const row = document.createElement('div');
+            row.className = 'prop-row';
+            
+            const label = document.createElement('label');
+            label.className = 'prop-label';
+            label.innerText = cfg.label + ' (' + cfg.unit + ')';
+            row.appendChild(label);
+            
             const input = document.createElement('input');
-            input.type = 'range'; input.min = 1; input.max = 100; input.value = comp.value * 100;
-            if(comp.type === 'CLOCK') { input.min = 100; input.max = 5000; input.value = comp.value; }
-            input.oninput = () => { 
-                comp.value = (comp.type === 'CLOCK') ? parseFloat(input.value) : parseFloat(input.value) / 100; 
-                updateSimulation(); 
-            };
-            propsContent.appendChild(input);
+            input.className = 'prop-input';
+            input.type = 'range';
+            input.min = cfg.min;
+            input.max = cfg.max;
+            input.step = (cfg.max - cfg.min) / 100;
+            input.value = comp[cfg.prop];
+            
             const valLabel = document.createElement('div');
-            valLabel.style.fontSize = '12px'; valLabel.style.marginTop = '5px';
-            valLabel.innerText = "Value: " + comp.value;
-            propsContent.appendChild(valLabel);
-            input.addEventListener('input', () => { valLabel.innerText = "Value: " + (comp.type === 'CLOCK' ? input.value : (input.value/100).toFixed(2)); });
-        } else { propsContent.innerText = "No adjustable properties."; }
+            valLabel.className = 'prop-value';
+            valLabel.innerText = parseFloat(comp[cfg.prop]).toFixed(2) + ' ' + cfg.unit;
+            
+            input.oninput = () => {
+                comp[cfg.prop] = parseFloat(input.value);
+                valLabel.innerText = parseFloat(input.value).toFixed(2) + ' ' + cfg.unit;
+                updateSimulation();
+            };
+            
+            row.appendChild(input);
+            row.appendChild(valLabel);
+            propsContent.appendChild(row);
+        } else {
+            const info = document.createElement('div');
+            info.style.cssText = 'font-size: 12px; color: #777; padding: 12px; text-align: center;';
+            info.innerText = "No adjustable properties";
+            propsContent.appendChild(info);
+        }
+        
+        // Add reset fuse button for fuses
+        if(comp.type === 'FUSE' && comp.blown) {
+            const resetBtn = document.createElement('button');
+            resetBtn.innerText = 'Reset Fuse';
+            resetBtn.style.cssText = 'width: 100%; margin-top: 10px; padding: 6px; background: #4caf50; border: none; border-radius: 4px; color: white; cursor: pointer;';
+            resetBtn.onclick = () => {
+                comp.blown = false;
+                comp.element.querySelector('.fuse-wire').classList.remove('blown');
+                updateSimulation();
+            };
+            propsContent.appendChild(resetBtn);
+        }
     }
 
+    // Track which tool is selected for click-to-place
+    let selectedToolType = null;
+    let clickPlaceMode = false;
+
     document.querySelectorAll('.tool-item').forEach(item => {
+        // Drag functionality
         item.ondragstart = (e) => e.dataTransfer.setData('type', item.dataset.type);
+        
+        // Click to place functionality
+        item.onclick = (e) => {
+            e.stopPropagation();
+            const wasSelected = selectedToolType === item.dataset.type && clickPlaceMode;
+            
+            // Deselect all tool items
+            document.querySelectorAll('.tool-item').forEach(t => t.style.opacity = '1');
+            
+            if (wasSelected) {
+                // Toggle off
+                selectedToolType = null;
+                clickPlaceMode = false;
+                workspace.style.cursor = 'default';
+            } else {
+                // Select this tool
+                selectedToolType = item.dataset.type;
+                clickPlaceMode = true;
+                item.style.opacity = '0.6';
+                workspace.style.cursor = 'crosshair';
+            }
+        };
     });
+
+    // Click on workspace to place component
+    workspace.onclick = (e) => {
+        if (clickPlaceMode && selectedToolType) {
+            e.stopPropagation();
+            const pos = screenToWorkspace(e.clientX, e.clientY);
+            const nc = new Component(selectedToolType, pos.x - 40, pos.y - 20);
+            components.push(nc);
+            updateSimulation();
+        }
+    };
 </script>
 </body>
 </html>
