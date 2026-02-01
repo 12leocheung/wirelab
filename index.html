@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ultimate DC & Logic Lab - Dark Edition</title>
+    <title>WireLab - Ultimate DC & Logic Lab</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -550,7 +550,7 @@
     <div id="sidebar-overlay"></div>
 
     <div id="toolbox">
-        <h2>Dark Lab</h2>
+        <h2>WireLab</h2>
         
         <h3>Power & Input</h3>
         <div class="tool-section">
@@ -608,7 +608,7 @@
             <div id="props-content"></div>
         </div>
         <div id="zoom-info">
-            <strong>Scroll</strong> to zoom • <strong>Middle-click + drag</strong> or <strong>Shift + click</strong> to pan
+            <strong>Scroll</strong> to zoom • <strong>Click + drag</strong> to pan
         </div>
     </div>
 </div>
@@ -937,9 +937,16 @@
         drawWires();
     };
 
-    // Middle mouse button or Space+Click for panning
+    // Left click and drag for panning (except when starting a component drag or interacting with controls)
     container.onmousedown = (e) => {
-        if(e.button === 1 || (e.button === 0 && e.shiftKey)) { // Middle mouse or Shift+Left click
+        // Only start panning with left mouse button
+        if(e.button === 0) {
+            // Don't start panning when clicking on form controls, the properties panel, the context menu, or toolbox items
+            const avoid = e.target && (e.target.closest && (e.target.closest('#props-panel') || e.target.closest('.tool-item') || e.target.closest('.prop-input') || ['INPUT','SELECT','TEXTAREA','BUTTON','LABEL'].includes(e.target.tagName)));
+            if(avoid) return;
+
+            // If the click was on a component, that element's onmousedown will call stopPropagation(),
+            // so we only get here for clicks on the workspace background or other non-component elements.
             e.preventDefault();
             isPanning = true;
             panStartX = e.clientX;
@@ -1511,6 +1518,257 @@
             updateSimulation();
         }
     };
+
+    // ============ CONTEXT MENU (right-click) ============
+    // Create menu element
+    const contextMenu = document.createElement('div');
+    contextMenu.style.cssText = 'position: absolute; z-index: 2000; background: #1b1b1b; color: var(--text-main); border: 1px solid #333; border-radius: 6px; padding: 8px; display: none; min-width: 180px; box-shadow: 0 8px 24px rgba(0,0,0,0.6);';
+    container.appendChild(contextMenu);
+
+    let clipboard = null; // {type: 'component'|'wire', data: {...}}
+
+    function hideContextMenu() {
+        contextMenu.style.display = 'none';
+        contextMenu.innerHTML = '';
+    }
+
+    function showContextMenuForComponent(comp, sx, sy) {
+        contextMenu.innerHTML = '';
+        const title = document.createElement('div');
+        title.style.cssText = 'font-weight:700; margin-bottom:6px;';
+        title.innerText = comp.type.replace(/_/g,' ');
+        contextMenu.appendChild(title);
+
+        // Quick properties area (if available)
+        const propConfigs = {
+            'BATTERY': { label: 'Voltage', min: 0.1, max: 1, prop: 'value', unit: 'V' },
+            'CLOCK': { label: 'Frequency', min: 100, max: 5000, prop: 'frequency', unit: 'ms' },
+            'RESISTOR': { label: 'Resistance', min: 1, max: 1000, prop: 'resistance', unit: 'Ω' },
+            'CAPACITOR': { label: 'Capacitance', min: 0.1, max: 1, prop: 'capacitance', unit: 'F' },
+            'INDUCTOR': { label: 'Inductance', min: 0.1, max: 1, prop: 'inductance', unit: 'H' },
+            'FUSE': { label: 'Rating', min: 0.1, max: 2, prop: 'value', unit: 'A' },
+            'DELAY': { label: 'Delay', min: 0, max: 2000, prop: 'delayTime', unit: 'ms' }
+        };
+
+        if(propConfigs[comp.type]) {
+            const cfg = propConfigs[comp.type];
+            const row = document.createElement('div');
+            row.style.cssText = 'margin-bottom:8px;';
+            const label = document.createElement('div');
+            label.style.cssText = 'font-size:12px; color: var(--text-dim); margin-bottom:4px;';
+            label.innerText = cfg.label + ' (' + cfg.unit + ')';
+            row.appendChild(label);
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.min = cfg.min; input.max = cfg.max; input.step = (cfg.max - cfg.min)/100; input.value = comp[cfg.prop];
+            input.style.cssText = 'width:100%';
+            const val = document.createElement('div');
+            val.style.cssText = 'font-family: monospace; font-size:12px; color:#aaa; text-align:right;';
+            val.innerText = parseFloat(comp[cfg.prop]).toFixed(2) + ' ' + cfg.unit;
+            input.oninput = () => { comp[cfg.prop] = parseFloat(input.value); val.innerText = parseFloat(input.value).toFixed(2) + ' ' + cfg.unit; updateSimulation(); };
+            row.appendChild(input); row.appendChild(val);
+            contextMenu.appendChild(row);
+        }
+
+        // Actions
+        const actions = [
+            { label: 'Properties', fn: () => { hideContextMenu(); selectComponent(comp); } },
+            { label: 'Copy', fn: () => { clipboard = { type: 'component', data: serializeComponent(comp) }; hideContextMenu(); } },
+            { label: 'Duplicate', fn: () => { duplicateComponent(comp); hideContextMenu(); } },
+            { label: 'Delete', fn: () => { comp.destroy(); hideContextMenu(); } }
+        ];
+
+        actions.forEach(a => {
+            const btn = document.createElement('div');
+            btn.style.cssText = 'padding:6px 8px; cursor:pointer; border-radius:4px;';
+            btn.onmouseover = () => btn.style.background = '#262626';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+            btn.innerText = a.label;
+            btn.onclick = a.fn;
+            contextMenu.appendChild(btn);
+        });
+
+        // Paste option when clipboard contains a component
+        if(clipboard && clipboard.type === 'component') {
+            const pasteBtn = document.createElement('div');
+            pasteBtn.style.cssText = 'padding:6px 8px; cursor:pointer; border-radius:4px; margin-top:6px; border-top:1px solid #222;';
+            pasteBtn.innerText = 'Paste here';
+            pasteBtn.onclick = () => {
+                const pos = screenToWorkspace(sx, sy);
+                const nc = deserializeComponent(clipboard.data, pos.x - 40, pos.y - 20);
+                components.push(nc);
+                updateSimulation();
+                hideContextMenu();
+            };
+            contextMenu.appendChild(pasteBtn);
+        }
+
+        contextMenu.style.left = sx + 'px';
+        contextMenu.style.top = sy + 'px';
+        contextMenu.style.display = 'block';
+    }
+
+    function showContextMenuForWire(w, sx, sy) {
+        contextMenu.innerHTML = '';
+        const title = document.createElement('div');
+        title.style.cssText = 'font-weight:700; margin-bottom:6px;';
+        title.innerText = 'Wire';
+        contextMenu.appendChild(title);
+
+        const info = document.createElement('div');
+        info.style.cssText = 'font-size:12px; color:#aaa; margin-bottom:8px;';
+        info.innerText = `From: ${w.from.type} (${w.from.id}) → To: ${w.to.type} (${w.to.id})`;
+        contextMenu.appendChild(info);
+
+        const actions = [
+            { label: 'Copy', fn: () => { clipboard = { type: 'wire', data: { fromId: w.from.id, toId: w.to.id, fromIdx: w.fromIdx, toIdx: w.toIdx } }; hideContextMenu(); } },
+            { label: 'Duplicate', fn: () => { wires.push({ ...w }); updateSimulation(); hideContextMenu(); } },
+            { label: 'Delete', fn: () => { wires = wires.filter(x => x !== w); hideContextMenu(); updateSimulation(); } }
+        ];
+
+        actions.forEach(a => {
+            const btn = document.createElement('div');
+            btn.style.cssText = 'padding:6px 8px; cursor:pointer; border-radius:4px;';
+            btn.onmouseover = () => btn.style.background = '#262626';
+            btn.onmouseout = () => btn.style.background = 'transparent';
+            btn.innerText = a.label;
+            btn.onclick = a.fn;
+            contextMenu.appendChild(btn);
+        });
+
+        if(clipboard && clipboard.type === 'wire') {
+            const pasteBtn = document.createElement('div');
+            pasteBtn.style.cssText = 'padding:6px 8px; cursor:pointer; border-radius:4px; margin-top:6px; border-top:1px solid #222;';
+            pasteBtn.innerText = 'Paste here';
+            pasteBtn.onclick = () => {
+                // Create new wire at clicked location if components exist
+                const from = components.find(c => c.id === clipboard.data.fromId);
+                const to = components.find(c => c.id === clipboard.data.toId);
+                if(from && to) {
+                    wires.push({ from, fromIdx: clipboard.data.fromIdx, to, toIdx: clipboard.data.toIdx });
+                    updateSimulation();
+                }
+                hideContextMenu();
+            };
+            contextMenu.appendChild(pasteBtn);
+        }
+
+        contextMenu.style.left = sx + 'px';
+        contextMenu.style.top = sy + 'px';
+        contextMenu.style.display = 'block';
+    }
+
+    // Utility: serialize component's editable properties
+    function serializeComponent(c) {
+        return {
+            type: c.type,
+            props: {
+                value: c.value,
+                resistance: c.resistance,
+                capacitance: c.capacitance,
+                inductance: c.inductance,
+                delayTime: c.delayTime,
+                frequency: c.frequency,
+                pulseWidth: c.pulseWidth,
+                counterValue: c.counterValue
+            }
+        };
+    }
+
+    function deserializeComponent(data, x, y) {
+        const nc = new Component(data.type, x, y);
+        Object.keys(data.props || {}).forEach(k => { if(k in nc) nc[k] = data.props[k]; });
+        return nc;
+    }
+
+    function duplicateComponent(c) {
+        const nc = deserializeComponent(serializeComponent(c), c.x + 20, c.y + 20);
+        components.push(nc);
+        updateSimulation();
+    }
+
+    // Hit test: find wire near screen coordinates (returns wire or null)
+    function findWireAt(screenX, screenY) {
+        const wp = screenToWorkspace(screenX, screenY);
+        let found = null;
+        const threshold = 8 / view.zoom;
+        wires.forEach(w => {
+            const sN = w.from.element.querySelectorAll('.node.output')[w.fromIdx || 0];
+            const eN = w.to.element.querySelectorAll('.node.input')[w.toIdx];
+            if(!sN || !eN) return;
+            const sR = sN.getBoundingClientRect();
+            const eR = eN.getBoundingClientRect();
+            const wR = workspace.getBoundingClientRect();
+            const x1 = (sR.left + 6 - wR.left) / view.zoom;
+            const y1 = (sR.top + 6 - wR.top) / view.zoom;
+            const x2 = (eR.left + 6 - wR.left) / view.zoom;
+            const y2 = (eR.top + 6 - wR.top) / view.zoom;
+            const cp1x = x1 + 40, cp1y = y1, cp2x = x2 - 40, cp2y = y2;
+
+            // Sample bezier
+            const steps = 30;
+            for(let t=0;t<=steps;t++){
+                const tt = t/steps;
+                const ix = cubicBezierPoint(x1, cp1x, cp2x, x2, tt);
+                const iy = cubicBezierPoint(y1, cp1y, cp2y, y2, tt);
+                const dx = ix - wp.x; const dy = iy - wp.y;
+                const dist = Math.hypot(dx, dy);
+                if(dist < threshold) { found = w; break; }
+            }
+        });
+        return found;
+    }
+
+    function cubicBezierPoint(p0, p1, p2, p3, t) {
+        const c0 = (1-t)*(1-t)*(1-t);
+        const c1 = 3*(1-t)*(1-t)*t;
+        const c2 = 3*(1-t)*t*t;
+        const c3 = t*t*t;
+        return p0*c0 + p1*c1 + p2*c2 + p3*c3;
+    }
+
+    // Right-click handler
+    container.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        hideContextMenu();
+        const el = document.elementFromPoint(ev.clientX, ev.clientY);
+        const compEl = el && el.closest ? el.closest('.component') : null;
+        if(compEl) {
+            const comp = components.find(c => c.element === compEl || c.element.dataset.id === compEl.dataset.id);
+            if(comp) { showContextMenuForComponent(comp, ev.clientX, ev.clientY); return; }
+        }
+
+        // Check for wire under cursor
+        const wire = findWireAt(ev.clientX, ev.clientY);
+        if(wire) { selectedWire = wire; showContextMenuForWire(wire, ev.clientX, ev.clientY); drawWires(); return; }
+
+        // Otherwise show workspace-level menu (paste)
+        contextMenu.innerHTML = '';
+        const title = document.createElement('div'); title.style.cssText = 'font-weight:700; margin-bottom:6px;'; title.innerText = 'Workspace'; contextMenu.appendChild(title);
+        if(clipboard) {
+            const pasteBtn = document.createElement('div'); pasteBtn.style.cssText = 'padding:6px 8px; cursor:pointer; border-radius:4px;'; pasteBtn.innerText = 'Paste'; pasteBtn.onclick = () => {
+                const pos = screenToWorkspace(ev.clientX, ev.clientY);
+                if(clipboard.type === 'component') {
+                    const nc = deserializeComponent(clipboard.data, pos.x - 40, pos.y - 20);
+                    components.push(nc);
+                    updateSimulation();
+                } else if(clipboard.type === 'wire') {
+                    const from = components.find(c => c.id === clipboard.data.fromId);
+                    const to = components.find(c => c.id === clipboard.data.toId);
+                    if(from && to) { wires.push({ from, fromIdx: clipboard.data.fromIdx, to, toIdx: clipboard.data.toIdx }); updateSimulation(); }
+                }
+                hideContextMenu();
+            };
+            contextMenu.appendChild(pasteBtn);
+        } else {
+            const info = document.createElement('div'); info.style.cssText = 'font-size:12px;color:#888; padding:6px 0;'; info.innerText = 'Right-click a component or wire for actions.'; contextMenu.appendChild(info);
+        }
+        contextMenu.style.left = ev.clientX + 'px'; contextMenu.style.top = ev.clientY + 'px'; contextMenu.style.display = 'block';
+    });
+
+    // Hide context menu on any left click or ESC
+    document.addEventListener('click', (e) => { if(contextMenu.style.display === 'block') hideContextMenu(); });
+    document.addEventListener('keydown', (e) => { if(e.key === 'Escape') hideContextMenu(); });
 </script>
 </body>
 </html>
