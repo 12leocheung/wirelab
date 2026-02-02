@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WireLab - Ultimate DC & Logic Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg-color: #121212;
@@ -19,7 +20,7 @@
         }
 
         * { box-sizing: border-box; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; overflow: hidden; background-color: var(--bg-color); color: var(--text-main); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; font-family: 'Roboto Mono', monospace; overflow: hidden; background-color: var(--bg-color); color: var(--text-main); }
         #app { display: flex; width: 100vw; height: 100vh; position: relative; }
 
         /* Hamburger Menu Button */
@@ -123,8 +124,8 @@
             background: #2c2c2c; 
             border: 1px solid #444; 
             border-radius: 8px;
-            padding: 8px 12px; 
-            margin-bottom: 6px; 
+            padding: 10px 12px; 
+            margin-bottom: 8px; 
             cursor: grab; 
             display: flex; 
             align-items: center; 
@@ -133,6 +134,7 @@
             font-size: 13px; 
             user-select: none; 
             color: var(--text-main);
+            min-height: 44px;
         }
         .tool-item:hover { 
             background: #3d3d3d; 
@@ -246,6 +248,15 @@
         }
         .node.input { left: -8px; }
         .node.output { right: -8px; }
+
+        @media (max-width: 768px) {
+            .node {
+                width: 18px;
+                height: 18px;
+            }
+            .node.input { left: -12px; }
+            .node.output { right: -12px; }
+        }
 
         .readout {
             font-family: 'Courier New', monospace; 
@@ -412,6 +423,133 @@
             color: var(--accent-color);
         }
         
+        /* Mobile floating toolbar */
+        #mobile-toolbar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #252525 0%, #1e1e1e 100%);
+            border: 2px solid var(--accent-color);
+            border-radius: 12px;
+            padding: 12px;
+            z-index: 500;
+            box-shadow: 0 8px 32px rgba(3, 169, 244, 0.2);
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #mobile-toolbar button {
+            padding: 10px 16px;
+            background: #2c2c2c;
+            color: var(--text-main);
+            border: 1px solid #444;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 100px;
+            transition: all 0.2s;
+        }
+
+        #mobile-toolbar button:active {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        @media (max-width: 768px) {
+            #mobile-toolbar {
+                display: flex;
+            }
+        }
+        
+        /* Guidebook Modal */
+        #guidebook-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 3000;
+            overflow-y: auto;
+        }
+
+        #guidebook-content {
+            background: var(--panel-color);
+            margin: 20px auto;
+            max-width: 900px;
+            border-radius: 12px;
+            padding: 24px;
+            border: 2px solid var(--accent-color);
+        }
+
+        #guidebook-content h2 {
+            margin-top: 0;
+            color: var(--accent-color);
+            text-align: center;
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .guide-close-btn {
+            float: right;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+        }
+
+        .guide-close-btn:hover {
+            background: #ff1744;
+        }
+
+        .component-guide-item {
+            margin-bottom: 28px;
+            padding: 16px;
+            background: #262626;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-color);
+        }
+
+        .guide-item-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin-bottom: 8px;
+        }
+
+        .guide-item-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            margin: 12px 0;
+            max-height: 200px;
+            object-fit: cover;
+        }
+
+        .guide-item-description {
+            font-size: 13px;
+            color: var(--text-main);
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .guide-item-spec {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin: 4px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
         .prop-row {
             margin-bottom: 14px;
         }
@@ -503,8 +641,8 @@
             #menu-toggle {
                 top: 10px;
                 left: 10px;
-                width: 40px;
-                height: 40px;
+                width: 50px;
+                height: 50px;
             }
             
             h2 {
@@ -513,8 +651,16 @@
             }
             
             .tool-item {
-                padding: 10px 12px;
+                padding: 12px 12px;
                 font-size: 14px;
+                min-height: 44px;
+                display: flex;
+                align-items: center;
+            }
+            
+            .tool-icon {
+                width: 36px;
+                height: 28px;
             }
             
             #props-panel {
@@ -522,6 +668,26 @@
                 top: 70px;
                 width: calc(100vw - 20px);
                 max-width: 300px;
+            }
+
+            .prop-input {
+                padding: 12px 10px;
+                font-size: 14px;
+            }
+
+            button#reset-btn,
+            button#save-btn,
+            button#load-btn,
+            button#undo-btn,
+            button#redo-btn {
+                min-height: 44px;
+                font-size: 14px;
+                padding: 12px 10px;
+            }
+
+            #zoom-info {
+                font-size: 12px;
+                padding: 12px;
             }
         }
 
@@ -532,8 +698,30 @@
             }
             
             .tool-item {
+                font-size: 13px;
+                padding: 10px 10px;
+                min-height: 42px;
+            }
+
+            #menu-toggle {
+                width: 44px;
+                height: 44px;
+            }
+
+            button#reset-btn,
+            button#save-btn,
+            button#load-btn,
+            button#undo-btn,
+            button#redo-btn {
+                min-height: 42px;
+                font-size: 13px;
+                padding: 10px 8px;
+            }
+
+            #props-panel {
+                width: calc(100vw - 15px);
                 font-size: 12px;
-                padding: 8px 10px;
+                padding: 12px;
             }
         }
     </style>
@@ -556,8 +744,8 @@
         <div class="tool-section">
             <div class="tool-item" draggable="true" data-type="BATTERY"><div class="tool-icon">9V</div><span>Battery</span></div>
             <div class="tool-item" draggable="true" data-type="CLOCK"><div class="tool-icon">Hz</div><span>Clock</span></div>
-            <div class="tool-item" draggable="true" data-type="SWITCH"><div class="tool-icon">⏻</div><span>Toggle Switch</span></div>
-            <div class="tool-item" draggable="true" data-type="BUTTON"><div class="tool-icon">🔘</div><span>Push Button</span></div>
+            <div class="tool-item" draggable="true" data-type="SWITCH"><div class="tool-icon">⏻</div><span>Switch</span></div>
+            <div class="tool-item" draggable="true" data-type="BUTTON"><div class="tool-icon">🔘</div><span>Button</span></div>
         </div>
 
         <h3>Logic Gates</h3>
@@ -598,6 +786,14 @@
         </div>
 
         <button id="reset-btn">Reset All</button>
+        <div style="display: flex; gap: 6px; margin-top: 10px;">
+            <button id="undo-btn" style="flex: 1; padding: 12px; background: #ff9800; color: white; border: 1px solid #f57c00; border-radius: 5px; cursor: pointer; transition: 0.2s; min-height: 44px; font-size: 13px;" title="Ctrl+Z">↶ Undo</button>
+            <button id="redo-btn" style="flex: 1; padding: 12px; background: #ff9800; color: white; border: 1px solid #f57c00; border-radius: 5px; cursor: pointer; transition: 0.2s; min-height: 44px; font-size: 13px;" title="Ctrl+Y">↷ Redo</button>
+        </div>
+        <button id="snap-grid-btn" style="margin-top: 10px; padding: 12px; background: #9c27b0; color: white; border: 1px solid #7b1fa2; border-radius: 5px; cursor: pointer; transition: 0.2s; width: 100%; min-height: 44px; font-size: 13px; opacity: 0.6;">📐 Snap Grid OFF</button>
+        <button id="save-btn" style="margin-top: 10px; padding: 12px; background: #4caf50; color: white; border: 1px solid #45a049; border-radius: 5px; cursor: pointer; transition: 0.2s; width: 100%; min-height: 44px; font-size: 13px;">Save Circuit</button>
+        <button id="load-btn" style="margin-top: 6px; padding: 12px; background: #2196f3; color: white; border: 1px solid #1976d2; border-radius: 5px; cursor: pointer; transition: 0.2s; width: 100%; min-height: 44px; font-size: 13px;">Load Circuit</button>
+        <button id="guide-btn" style="margin-top: 6px; padding: 12px; background: #4fc3f7; color: white; border: 1px solid #29b6f6; border-radius: 5px; cursor: pointer; transition: 0.2s; width: 100%; min-height: 44px; font-size: 13px;">📖 Component Guide</button>
     </div>
 
     <div id="workspace-container">
@@ -609,6 +805,18 @@
         </div>
         <div id="zoom-info">
             <strong>Scroll</strong> to zoom • <strong>Click + drag</strong> to pan
+        </div>
+        <div id="mobile-toolbar">
+            <button onclick="document.getElementById('menu-toggle').click();" title="Toggle menu">☰ Menu</button>
+            <button onclick="undo();" title="Undo (Ctrl+Z)">↶ Undo</button>
+            <button onclick="redo();" title="Redo (Ctrl+Y)">↷ Redo</button>
+        </div>
+        <div id="guidebook-modal">
+            <div id="guidebook-content">
+                <button class="guide-close-btn" onclick="document.getElementById('guidebook-modal').style.display='none';">×</button>
+                <h2>📖 Component Guidebook</h2>
+                <div id="guide-items"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -628,6 +836,267 @@
     let isDragging = false, activeWireStart = null, selectedComponent = null, selectedWire = null;
     let dragOffsetX = 0, dragOffsetY = 0;
     let simulationRunning = true;
+    let snapGridEnabled = false;
+    const SNAP_GRID_SIZE = 25;
+
+    // ============ UNDO/REDO HISTORY ============
+    let history = [];
+    let historyIndex = -1;
+    const MAX_HISTORY = 100;
+
+    function captureState() {
+        // Remove any redo history if we make a new action
+        if(historyIndex < history.length - 1) {
+            history = history.slice(0, historyIndex + 1);
+        }
+
+        const state = {
+            components: components.map(c => ({
+                type: c.type,
+                id: c.id,
+                x: c.x,
+                y: c.y,
+                value: c.value,
+                resistance: c.resistance,
+                capacitance: c.capacitance,
+                inductance: c.inductance,
+                delayTime: c.delayTime,
+                frequency: c.frequency,
+                pulseWidth: c.pulseWidth,
+                counterValue: c.counterValue,
+                state: c.state,
+                blown: c.blown
+            })),
+            wires: wires.map(w => ({
+                fromId: w.from.id,
+                fromIdx: w.fromIdx,
+                toId: w.to.id,
+                toIdx: w.toIdx
+            }))
+        };
+
+        history.push(state);
+        if(history.length > MAX_HISTORY) history.shift();
+        else historyIndex++;
+        
+        updateUndoRedoButtons();
+    }
+
+    function restoreState(state) {
+        clearCanvas();
+        const idMap = {};
+
+        state.components.forEach(cd => {
+            const nc = new Component(cd.type, cd.x, cd.y);
+            nc.value = cd.value;
+            nc.resistance = cd.resistance;
+            nc.capacitance = cd.capacitance;
+            nc.inductance = cd.inductance;
+            nc.delayTime = cd.delayTime;
+            nc.frequency = cd.frequency;
+            nc.pulseWidth = cd.pulseWidth;
+            nc.counterValue = cd.counterValue;
+            nc.state = cd.state;
+            nc.blown = cd.blown;
+            if(cd.blown && nc.element.querySelector('.fuse-wire')) {
+                nc.element.querySelector('.fuse-wire').classList.add('blown');
+            }
+            components.push(nc);
+            idMap[cd.id] = nc;
+        });
+
+        state.wires.forEach(wd => {
+            const from = idMap[wd.fromId];
+            const to = idMap[wd.toId];
+            if(from && to) {
+                wires.push({
+                    from: from,
+                    fromIdx: wd.fromIdx,
+                    to: to,
+                    toIdx: wd.toIdx,
+                    color: null
+                });
+            }
+        });
+
+        updateSimulation();
+        updateUndoRedoButtons();
+    }
+
+    function undo() {
+        if(historyIndex > 0) {
+            historyIndex--;
+            restoreState(history[historyIndex]);
+        }
+    }
+
+    function redo() {
+        if(historyIndex < history.length - 1) {
+            historyIndex++;
+            restoreState(history[historyIndex]);
+        }
+    }
+
+    function updateUndoRedoButtons() {
+        const undoBtn = document.getElementById('undo-btn');
+        const redoBtn = document.getElementById('redo-btn');
+        undoBtn.disabled = historyIndex <= 0;
+        redoBtn.disabled = historyIndex >= history.length - 1;
+        undoBtn.style.opacity = historyIndex <= 0 ? '0.5' : '1';
+        redoBtn.style.opacity = historyIndex >= history.length - 1 ? '0.5' : '1';
+    }
+
+    document.getElementById('undo-btn').onclick = undo;
+    document.getElementById('redo-btn').onclick = redo;
+
+    document.getElementById('snap-grid-btn').onclick = () => {
+        snapGridEnabled = !snapGridEnabled;
+        const btn = document.getElementById('snap-grid-btn');
+        btn.innerText = snapGridEnabled ? '📐 Snap Grid ON' : '📐 Snap Grid OFF';
+        btn.style.opacity = snapGridEnabled ? '1' : '0.6';
+    };
+
+    // ============ COMPONENT GUIDEBOOK ============
+    const componentGuides = {
+        'BATTERY': {
+            name: 'Battery',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4f/Battery_symbol.svg/220px-Battery_symbol.svg.png',
+            description: 'A DC power source that provides a constant voltage output. Used to power circuits.',
+            specs: ['Output: 0-9V (adjustable)', 'Inputs: 0', 'Outputs: 1']
+        },
+        'CLOCK': {
+            name: 'Clock',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/CLK.svg/220px-CLK.svg.png',
+            description: 'Generates a periodic square wave signal at a specified frequency. Useful for timing and synchronization.',
+            specs: ['Frequency: 100-5000 ms (adjustable)', 'Inputs: 0', 'Outputs: 1']
+        },
+        'SWITCH': {
+            name: 'Toggle Switch',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/Electrical_switch_symbol.svg/220px-Electrical_switch_symbol.svg.png',
+            description: 'A manual switch that can be toggled ON/OFF to control circuit flow. Click the switch in the component to toggle.',
+            specs: ['Manual control', 'Inputs: 1', 'Outputs: 1']
+        },
+        'BUTTON': {
+            name: 'Push Button',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Button.svg/220px-Button.svg.png',
+            description: 'A momentary switch that outputs signal only when pressed. Release to turn off.',
+            specs: ['Momentary output', 'Inputs: 0', 'Outputs: 1']
+        },
+        'AND': {
+            name: 'AND Gate',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/AND_ANSI.svg/220px-AND_ANSI.svg.png',
+            description: 'Outputs HIGH only when all inputs are HIGH. All inputs must be powered for output.',
+            specs: ['Logic operation: A AND B', 'Inputs: 2', 'Outputs: 1']
+        },
+        'OR': {
+            name: 'OR Gate',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b5/OR_ANSI.svg/220px-OR_ANSI.svg.png',
+            description: 'Outputs HIGH when at least one input is HIGH. Only one input needs to be powered.',
+            specs: ['Logic operation: A OR B', 'Inputs: 2', 'Outputs: 1']
+        },
+        'NOT': {
+            name: 'NOT Gate',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/NOT_ANSI.svg/220px-NOT_ANSI.svg.png',
+            description: 'Inverts the input signal. HIGH becomes LOW, and vice versa.',
+            specs: ['Logic operation: NOT A', 'Inputs: 1', 'Outputs: 1']
+        },
+        'XOR': {
+            name: 'XOR Gate',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/XOR_ANSI.svg/220px-XOR_ANSI.svg.png',
+            description: 'Outputs HIGH when inputs are different. If both inputs are the same, output is LOW.',
+            specs: ['Logic operation: A XOR B', 'Inputs: 2', 'Outputs: 1']
+        },
+        'LIGHT': {
+            name: 'Light Bulb',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Light_bulb_icon.svg/220px-Light_bulb_icon.svg.png',
+            description: 'An output device that glows when powered. Yellow glow indicates the circuit is powered.',
+            specs: ['Visual indicator', 'Inputs: 1', 'Outputs: 0']
+        },
+        'RESISTOR': {
+            name: 'Resistor',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/Resistor_symbol.svg/220px-Resistor_symbol.svg.png',
+            description: 'Reduces voltage and current in a circuit. Higher resistance values drop more voltage.',
+            specs: ['Resistance: 1-1000 Ω (adjustable)', 'Inputs: 1', 'Outputs: 1']
+        },
+        'CAPACITOR': {
+            name: 'Capacitor',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Capacitor_symbol.svg/220px-Capacitor_symbol.svg.png',
+            description: 'Stores electrical charge and can release it over time. Creates smooth transitions in voltage.',
+            specs: ['Capacitance: 0.1-1 F (adjustable)', 'Inputs: 1', 'Outputs: 1']
+        },
+        'FUSE': {
+            name: 'Fuse',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Fuse_symbol.svg/220px-Fuse_symbol.svg.png',
+            description: 'Protects circuits from overcurrent. Blows (breaks) if current exceeds rating.',
+            specs: ['Rating: 0.1-2 A (adjustable)', 'Inputs: 1', 'Outputs: 1']
+        },
+        'SR_LATCH': {
+            name: 'SR Latch',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/SR_Flip-Flop.svg/220px-SR_Flip-Flop.svg.png',
+            description: 'A memory element with Set and Reset inputs. Stores state until changed.',
+            specs: ['Set/Reset memory', 'Inputs: 2 (Set, Reset)', 'Outputs: 1']
+        },
+        'D_FF': {
+            name: 'D Flip-Flop',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9c/D-Type_Flip-flop.svg/220px-D-Type_Flip-flop.svg.png',
+            description: 'Captures the input value on clock edge. Second input is clock signal.',
+            specs: ['Clock-triggered storage', 'Inputs: 2 (Data, Clock)', 'Outputs: 1']
+        },
+        'DELAY': {
+            name: 'Delay',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3d/Delay_line_symbol.svg/220px-Delay_line_symbol.svg.png',
+            description: 'Delays the input signal by a specified time. Useful for timing circuits.',
+            specs: ['Delay: 0-2000 ms (adjustable)', 'Inputs: 1', 'Outputs: 1']
+        },
+        '7SEG': {
+            name: '7-Segment Display',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/7-segment_display.png/220px-7-segment_display.png',
+            description: 'Visual display with 7 segments (a-g). Each input node controls one segment.',
+            specs: ['7 independent segments', 'Inputs: 7', 'Outputs: 0']
+        },
+        'VOLTMETER': {
+            name: 'Voltmeter',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Voltmeter_symbol.svg/220px-Voltmeter_symbol.svg.png',
+            description: 'Measures voltage difference between two points. Shows reading in real-time.',
+            specs: ['Voltage measurement', 'Inputs: 2', 'Outputs: 0']
+        },
+        'AMMETER': {
+            name: 'Ammeter',
+            image: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fe/Ammeter_symbol.svg/220px-Ammeter_symbol.svg.png',
+            description: 'Measures electric current flowing through it. Shows reading in real-time.',
+            specs: ['Current measurement', 'Inputs: 1', 'Outputs: 1']
+        }
+    };
+
+    function populateGuidebook() {
+        const guideItems = document.getElementById('guide-items');
+        guideItems.innerHTML = '';
+        
+        Object.keys(componentGuides).forEach(key => {
+            const guide = componentGuides[key];
+            const item = document.createElement('div');
+            item.className = 'component-guide-item';
+            item.innerHTML = `
+                <div class="guide-item-title">${guide.name}</div>
+                <img src="${guide.image}" alt="${guide.name}" class="guide-item-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22%3E%3Crect fill=%22%23444%22 width=%22200%22 height=%22150%22/%3E%3Ctext x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23aaa%22 font-size=%2214%22%3EImage unavailable%3C/text%3E%3C/svg%3E'">
+                <div class="guide-item-description">${guide.description}</div>
+                <div class="guide-item-spec">📊 ${guide.specs.join(' • ')}</div>
+            `;
+            guideItems.appendChild(item);
+        });
+    }
+
+    document.getElementById('guide-btn').onclick = () => {
+        populateGuidebook();
+        document.getElementById('guidebook-modal').style.display = 'block';
+    };
+
+    // Close guidebook on outside click
+    document.getElementById('guidebook-modal').addEventListener('click', (e) => {
+        if(e.target.id === 'guidebook-modal') {
+            document.getElementById('guidebook-modal').style.display = 'none';
+        }
+    });
 
     // Toggle Sidebar
     function toggleSidebar() {
@@ -856,6 +1325,22 @@
                         wires.push({ from: activeWireStart.comp, fromIdx: 0, to: comp, toIdx: i, color: null });
                         activeWireStart = null;
                         updateSimulation();
+                        captureState();
+                    }
+                };
+                // Mobile: click input node to complete wire connection
+                node.onclick = (e) => {
+                    e.stopPropagation();
+                    if(window.innerWidth <= 768 && mobileWireStartNode && mobileWireStartComp) {
+                        // Input node receives connection from output node
+                        if(mobileWireStartNode.classList.contains('output')) {
+                            wires.push({ from: mobileWireStartComp, fromIdx: parseInt(mobileWireStartNode.dataset.index), to: this, toIdx: i, color: null });
+                            mobileWireStartNode = null;
+                            mobileWireStartComp = null;
+                            updateSimulation();
+                            captureState();
+                            drawWires();
+                        }
                     }
                 };
                 this.element.appendChild(node);
@@ -876,6 +1361,14 @@
                         idx: i
                     };
                 };
+                // Mobile: click output node to start wire connection
+                node.onclick = (e) => {
+                    e.stopPropagation();
+                    if(window.innerWidth <= 768) {
+                        mobileWireStartNode = node;
+                        mobileWireStartComp = this;
+                    }
+                };
                 this.element.appendChild(node);
             }
         }
@@ -889,10 +1382,88 @@
                 propsPanel.style.display = 'none';
             }
             updateSimulation();
+            captureState();
         }
     }
 
     document.getElementById('reset-btn').onclick = clearCanvas;
+
+    // ============ SAVE / LOAD CIRCUIT ============
+    function saveCircuit() {
+        const data = {
+            components: components.map(c => ({
+                type: c.type,
+                x: c.x,
+                y: c.y,
+                id: c.id,
+                value: c.value,
+                resistance: c.resistance,
+                capacitance: c.capacitance,
+                inductance: c.inductance,
+                delayTime: c.delayTime,
+                frequency: c.frequency,
+                pulseWidth: c.pulseWidth,
+                counterValue: c.counterValue,
+                state: c.state
+            })),
+            wires: wires.map(w => ({
+                fromId: w.from.id,
+                fromIdx: w.fromIdx,
+                toId: w.to.id,
+                toIdx: w.toIdx
+            }))
+        };
+        localStorage.setItem('wirelabCircuit', JSON.stringify(data));
+        alert('Circuit saved!');
+    }
+
+    function loadCircuit() {
+        const saved = localStorage.getItem('wirelabCircuit');
+        if(!saved) { alert('No saved circuit found.'); return; }
+        
+        try {
+            clearCanvas();
+            const data = JSON.parse(saved);
+            const idMap = {};
+            
+            data.components.forEach(cd => {
+                const nc = new Component(cd.type, cd.x, cd.y);
+                nc.value = cd.value;
+                nc.resistance = cd.resistance;
+                nc.capacitance = cd.capacitance;
+                nc.inductance = cd.inductance;
+                nc.delayTime = cd.delayTime;
+                nc.frequency = cd.frequency;
+                nc.pulseWidth = cd.pulseWidth;
+                nc.counterValue = cd.counterValue;
+                nc.state = cd.state;
+                components.push(nc);
+                idMap[cd.id] = nc;
+            });
+            
+            data.wires.forEach(wd => {
+                const from = idMap[wd.fromId];
+                const to = idMap[wd.toId];
+                if(from && to) {
+                    wires.push({
+                        from: from,
+                        fromIdx: wd.fromIdx,
+                        to: to,
+                        toIdx: wd.toIdx,
+                        color: null
+                    });
+                }
+            });
+            
+            updateSimulation();
+            alert('Circuit loaded!');
+        } catch(e) {
+            alert('Error loading circuit: ' + e.message);
+        }
+    }
+
+    document.getElementById('save-btn').onclick = saveCircuit;
+    document.getElementById('load-btn').onclick = loadCircuit;
 
     workspace.onmousedown = (e) => {
         if(e.target === workspace || e.target === canvas) {
@@ -902,6 +1473,35 @@
             document.querySelectorAll('.component').forEach(c => c.classList.remove('selected'));
         }
     };
+
+    let mobileWireStartNode = null;
+    let mobileWireStartComp = null;
+
+    // ============ MOBILE ENHANCEMENTS ============
+    // Long-press detection for nodes (show info tooltip)
+    let longPressTimer = null;
+
+    // Swipe to toggle menu on mobile
+    let touchStartX = 0;
+    document.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        if(longPressTimer) clearTimeout(longPressTimer);
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+        if(longPressTimer) clearTimeout(longPressTimer);
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+        const touchEndX = e.touches[0].clientX;
+        const diff = touchStartX - touchEndX;
+        // Swipe left to close menu, swipe right to open
+        if(diff > 50 && window.innerWidth <= 768 && !toolbox.classList.contains('collapsed')) {
+            toggleSidebar();
+        } else if(diff < -50 && window.innerWidth <= 768 && toolbox.classList.contains('collapsed')) {
+            toggleSidebar();
+        }
+    }, { passive: true });
 
     let isPanning = false;
     let panStartX = 0;
@@ -918,8 +1518,10 @@
             workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
             drawWires();
         } else if(isDragging) {
-            const newX = (e.clientX / view.zoom) - dragOffsetX;
-            const newY = (e.clientY / view.zoom) - dragOffsetY;
+            let newX = (e.clientX / view.zoom) - dragOffsetX;
+            let newY = (e.clientY / view.zoom) - dragOffsetY;
+            newX = snapToGrid(newX);
+            newY = snapToGrid(newY);
             isDragging.x = newX;
             isDragging.y = newY;
             isDragging.element.style.left = newX + 'px';
@@ -931,6 +1533,7 @@
     };
 
     document.onmouseup = (e) => {
+        if(isDragging) captureState();
         isDragging = false;
         isPanning = false;
         activeWireStart = null;
@@ -1007,9 +1610,12 @@
             if(clickPlaceMode && selectedToolType) {
                 ev.preventDefault();
                 const pos = screenToWorkspace(t.clientX, t.clientY);
-                const nc = new Component(selectedToolType, pos.x - 40, pos.y - 20);
+                let x = snapToGrid(pos.x - 40);
+                let y = snapToGrid(pos.y - 20);
+                const nc = new Component(selectedToolType, x, y);
                 components.push(nc);
                 updateSimulation();
+                captureState();
                 return;
             }
 
@@ -1028,23 +1634,42 @@
                 }
             }
 
-            // Otherwise start panning
+            // Otherwise start panning with one finger (hold to pan)
             isTouchPanning = true;
             panStartX = t.clientX;
             panStartY = t.clientY;
             ev.preventDefault();
         } else if(ev.touches.length === 2) {
-            // Pinch start
-            isPinching = true;
-            isTouchPanning = false;
+            // Two-finger interaction: could be pinch or pan
             const t0 = ev.touches[0], t1 = ev.touches[1];
-            pinchStartDist = getTouchDistance(t0, t1);
-            pinchStartZoom = view.zoom;
-            pinchMidX = (t0.clientX + t1.clientX) / 2;
-            pinchMidY = (t0.clientY + t1.clientY) / 2;
+            
+            // Check if either touch is on a component for selection
+            const el0 = document.elementFromPoint(t0.clientX, t0.clientY);
+            const el1 = document.elementFromPoint(t1.clientX, t1.clientY);
+            const comp0 = el0 && el0.closest ? el0.closest('.component') : null;
+            const comp1 = el1 && el1.closest ? el1.closest('.component') : null;
+            
+            if(comp0 || comp1) {
+                // User is trying to interact with a component, allow it
+                // Start two-finger pan for workspace scrolling
+                isTwoFingerPanning = true;
+                twoFingerPanStartX = t0.clientX;
+                twoFingerPanStartY = t0.clientY;
+                ev.preventDefault();
+                return;
+            }
+
+            // Two-finger pan/scroll
+            isTwoFingerPanning = true;
+            twoFingerPanStartX = t0.clientX;
+            twoFingerPanStartY = t0.clientY;
             ev.preventDefault();
         }
     }, { passive: false });
+
+    let twoFingerPanStartX = 0;
+    let twoFingerPanStartY = 0;
+    let isTwoFingerPanning = false;
 
     container.addEventListener('touchmove', (ev) => {
         if(isPinching && ev.touches.length === 2) {
@@ -1066,12 +1691,29 @@
             return;
         }
 
+        // Two-finger pan (scroll around the workspace)
+        if(isTwoFingerPanning && ev.touches.length === 2) {
+            const t0 = ev.touches[0];
+            const deltaX = t0.clientX - twoFingerPanStartX;
+            const deltaY = t0.clientY - twoFingerPanStartY;
+            view.panX += deltaX;
+            view.panY += deltaY;
+            twoFingerPanStartX = t0.clientX;
+            twoFingerPanStartY = t0.clientY;
+            workspace.style.transform = `translate(${view.panX}px, ${view.panY}px) scale(${view.zoom})`;
+            drawWires();
+            ev.preventDefault();
+            return;
+        }
+
         if(ev.touches.length === 1) {
             const t = ev.touches[0];
             if(isDragging) {
                 // dragging a component
-                const newX = (t.clientX / view.zoom) - dragOffsetX;
-                const newY = (t.clientY / view.zoom) - dragOffsetY;
+                let newX = (t.clientX / view.zoom) - dragOffsetX;
+                let newY = (t.clientY / view.zoom) - dragOffsetY;
+                newX = snapToGrid(newX);
+                newY = snapToGrid(newY);
                 isDragging.x = newX; isDragging.y = newY;
                 isDragging.element.style.left = newX + 'px';
                 isDragging.element.style.top = newY + 'px';
@@ -1100,18 +1742,26 @@
         if(ev.touches.length === 0) {
             isPinching = false;
             isTouchPanning = false;
+            isTwoFingerPanning = false;
             if(isDragging) isDragging = false;
             drawWires();
+        } else if(ev.touches.length === 1) {
+            // One finger left, clear two-finger panning
+            isTwoFingerPanning = false;
         }
     });
 
     document.onkeydown = (e) => {
-        if(e.key === 'Delete' && selectedComponent) {
+        if((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undo(); }
+        else if((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'Z'))) { e.preventDefault(); redo(); }
+        else if(e.key === 'Delete' && selectedComponent) {
             selectedComponent.destroy();
+            captureState();
         } else if(e.key === 'Delete' && selectedWire) {
             wires = wires.filter(w => w !== selectedWire);
             selectedWire = null;
             updateSimulation();
+            captureState();
         }
     };
 
@@ -1121,6 +1771,11 @@
             x: (x - rect.left - view.panX) / view.zoom, 
             y: (y - rect.top - view.panY) / view.zoom 
         };
+    }
+
+    function snapToGrid(coord) {
+        if(!snapGridEnabled) return coord;
+        return Math.round(coord / SNAP_GRID_SIZE) * SNAP_GRID_SIZE;
     }
 
     function isHigh(v) { 
@@ -1391,9 +2046,12 @@
     container.ondrop = (e) => {
         const type = e.dataTransfer.getData('type');
         const pos = screenToWorkspace(e.clientX, e.clientY);
-        const nc = new Component(type, pos.x - 40, pos.y - 20);
+        let x = snapToGrid(pos.x - 40);
+        let y = snapToGrid(pos.y - 20);
+        const nc = new Component(type, x, y);
         components.push(nc);
         updateSimulation();
+        captureState();
     };
 
     function clearCanvas() {
@@ -1508,14 +2166,16 @@
         };
     });
 
-    // Click on workspace to place component
     workspace.onclick = (e) => {
         if (clickPlaceMode && selectedToolType) {
             e.stopPropagation();
             const pos = screenToWorkspace(e.clientX, e.clientY);
-            const nc = new Component(selectedToolType, pos.x - 40, pos.y - 20);
+            let x = snapToGrid(pos.x - 40);
+            let y = snapToGrid(pos.y - 20);
+            const nc = new Component(selectedToolType, x, y);
             components.push(nc);
             updateSimulation();
+            captureState();
         }
     };
 
@@ -1574,7 +2234,7 @@
         const actions = [
             { label: 'Properties', fn: () => { hideContextMenu(); selectComponent(comp); } },
             { label: 'Copy', fn: () => { clipboard = { type: 'component', data: serializeComponent(comp) }; hideContextMenu(); } },
-            { label: 'Duplicate', fn: () => { duplicateComponent(comp); hideContextMenu(); } },
+            { label: 'Duplicate', fn: () => { duplicateComponent(comp); hideContextMenu(); captureState(); } },
             { label: 'Delete', fn: () => { comp.destroy(); hideContextMenu(); } }
         ];
 
@@ -1598,6 +2258,7 @@
                 const nc = deserializeComponent(clipboard.data, pos.x - 40, pos.y - 20);
                 components.push(nc);
                 updateSimulation();
+                captureState();
                 hideContextMenu();
             };
             contextMenu.appendChild(pasteBtn);
@@ -1622,8 +2283,8 @@
 
         const actions = [
             { label: 'Copy', fn: () => { clipboard = { type: 'wire', data: { fromId: w.from.id, toId: w.to.id, fromIdx: w.fromIdx, toIdx: w.toIdx } }; hideContextMenu(); } },
-            { label: 'Duplicate', fn: () => { wires.push({ ...w }); updateSimulation(); hideContextMenu(); } },
-            { label: 'Delete', fn: () => { wires = wires.filter(x => x !== w); hideContextMenu(); updateSimulation(); } }
+            { label: 'Duplicate', fn: () => { wires.push({ ...w }); updateSimulation(); captureState(); hideContextMenu(); } },
+            { label: 'Delete', fn: () => { wires = wires.filter(x => x !== w); hideContextMenu(); updateSimulation(); captureState(); } }
         ];
 
         actions.forEach(a => {
@@ -1647,6 +2308,7 @@
                 if(from && to) {
                     wires.push({ from, fromIdx: clipboard.data.fromIdx, to, toIdx: clipboard.data.toIdx });
                     updateSimulation();
+                    captureState();
                 }
                 hideContextMenu();
             };
@@ -1752,10 +2414,11 @@
                     const nc = deserializeComponent(clipboard.data, pos.x - 40, pos.y - 20);
                     components.push(nc);
                     updateSimulation();
+                    captureState();
                 } else if(clipboard.type === 'wire') {
                     const from = components.find(c => c.id === clipboard.data.fromId);
                     const to = components.find(c => c.id === clipboard.data.toId);
-                    if(from && to) { wires.push({ from, fromIdx: clipboard.data.fromIdx, to, toIdx: clipboard.data.toIdx }); updateSimulation(); }
+                    if(from && to) { wires.push({ from, fromIdx: clipboard.data.fromIdx, to, toIdx: clipboard.data.toIdx }); updateSimulation(); captureState(); }
                 }
                 hideContextMenu();
             };
